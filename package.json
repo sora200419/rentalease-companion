@@ -1,14 +1,19 @@
 {
-  "name": "rentalease-malaysia",
+  "name": "rentalease-companion",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:generate": "prisma generate",
+    "db:validate": "prisma validate",
+    "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate"
   },
+  "description": "RentalEase Move-Out Companion: an evidence-based tenancy assistant, built on the RentalEase FYP baseline.",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",

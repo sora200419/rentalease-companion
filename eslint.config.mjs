@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
   // editors flag them without breaking the build until the existing sites are
   // cleaned up; flip to "error" once the backlog is zero.
   {
+    files: ["**/*.{ts,tsx,mts,cts}"],
     languageOptions: {
       parserOptions: {
         projectService: true,

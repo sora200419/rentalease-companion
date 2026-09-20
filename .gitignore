@@ -46,3 +46,16 @@ next-env.d.ts
 
 # deployment artifacts
 deployment/
+
+# Only the placeholder template belongs in source control.
+!.env.example
+
+# Private runtime material and local exports.
+/uploads/
+/private-data/
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.db
+*.zip
