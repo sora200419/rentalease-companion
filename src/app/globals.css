@@ -1,0 +1,74 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens — RentalEase redesign.
+ *
+ * Fixed to light-mode values. The dark sidebar is a deliberate design choice
+ * (sidebar bg-gray-900), not a system dark-mode response. If OS-level dark
+ * mode support is ever added it should be implemented as a class toggle.
+ */
+:root {
+  /* Canvas */
+  --app-bg:        #f9fafb;   /* gray-50  */
+  --card-bg:       #ffffff;
+
+  /* Sidebar */
+  --sidebar-bg:    #111827;   /* gray-900 */
+  --sidebar-border:#1f2937;   /* gray-800 */
+
+  /* Accent */
+  --accent:        #2563eb;   /* blue-600 */
+  --accent-hover:  #1d4ed8;   /* blue-700 */
+
+  /* Text */
+  --text-primary:   #111827;  /* gray-900 */
+  --text-secondary: #6b7280;  /* gray-500 */
+  --text-muted:     #9ca3af;  /* gray-400 */
+
+  /* Borders */
+  --border:        #e5e7eb;   /* gray-200 */
+  --border-light:  #f3f4f6;   /* gray-100 */
+
+  /* Legacy compat (remove when all pages migrated) */
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+body {
+  background: var(--app-bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes kyc-scan {
+  0%   { transform: translateY(0px);   opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { transform: translateY(200px); opacity: 0; }
+}
+
+/* Dark option elements — native select dropdown inherits OS styling, override here */
+option {
+  background-color: #1C2740;
+  color: #ffffff;
+}
+
+/* Hide browser-native password reveal/clear buttons — we use our own toggle */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  pointer-events: none;
+}

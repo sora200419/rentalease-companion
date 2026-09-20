@@ -1,0 +1,853 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USER ────────────────────────────────────────────────────────────────────
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  password    String // bcrypt hash, never plaintext
+  role        Role     @default(TENANT)
+  phone       String?
+  icNumber    String?  @unique // Malaysian IC — sensitive, PDPA 2010 protected
+  isVerified  Boolean  @default(false) // set to true by admin after IC review
+  isSuspended Boolean  @default(false)
+  language    String   @default("en") // "en" or "ms" — bilingual preference
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Set whenever the password changes (reset or profile update). The JWT
+  // callback compares token.iat against this timestamp to invalidate any
+  // sessions issued before the change — kicks out attackers holding a stolen
+  // JWT after a password reset.
+  passwordChangedAt DateTime?
+
+  ownedProperties                  Property[]                @relation("LandlordProperties")
+  tenancies                        Tenancy[]                 @relation("TenantTenancies")
+  sentMessages                     Message[]                 @relation("SentMessages")
+  receivedMessages                 Message[]                 @relation("ReceivedMessages")
+  uploadedProofs                   PaymentProof[]            @relation("UploadedProofs")
+  createdReports                   ConditionReport[]         @relation("CreatedReports")
+  acknowledgedReports              ConditionReport[]         @relation("AcknowledgedReports")
+  reviewedReports                  ConditionReport[]         @relation("ReviewedReports")
+  uploadedConditionPhotos          ConditionPhoto[]          @relation("UploadedConditionPhotos")
+  uploadedPropertyPhotos           PropertyPhoto[]           @relation("UploadedPropertyPhotos")
+  uploadedDepositProofs            DepositProof[]            @relation("UploadedDepositProofs")
+  uploadedAgreementSignatureProofs AgreementSignatureProof[] @relation("UploadedAgreementSignatureProofs")
+  reviewedAgreementSignatureProofs AgreementSignatureProof[] @relation("ReviewedAgreementSignatureProofs")
+  authorizedCorporateTenancies     Tenancy[]                 @relation("AuthorizedCorporateTenancies")
+  linkedCorporateOccupancies       CorporateOccupant[]       @relation("LinkedCorporateOccupancies")
+
+  kycRejectedReason      String?         @db.Text // set by admin on KYC rejection; cleared on approval
+  kycSubmission          KycSubmission?  @relation("UserKyc")
+  reviewedKycSubmissions KycSubmission[] @relation("KycReviewer")
+
+  deletedAt     DateTime?
+  deletedById   String?
+  deletedReason String?
+
+  deletedBy         User?      @relation("DeletedUsers", fields: [deletedById], references: [id])
+  deletedUsers      User[]     @relation("DeletedUsers")
+  auditLogsAuthored AuditLog[] @relation("AuditLogActor")
+
+  notifications       Notification[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+enum Role {
+  LANDLORD
+  TENANT
+  ADMIN
+}
+
+// ─── PROPERTY ────────────────────────────────────────────────────────────────
+// A property is the physical building or unit. Room-level details (rent,
+// bathrooms) now live on the Room model so a single property can host
+// multiple tenants in separate rooms under separate agreements.
+model Property {
+  id             String   @id @default(cuid())
+  address        String
+  city           String
+  state          String
+  postcode       String
+  type           String // "Apartment", "Terrace House", "Condo", etc.
+  description    String?
+  isVerified     Boolean  @default(false) // set to true by admin after ownership review
+  rejectedReason String?  @db.Text // set by admin on rejection; cleared on approval
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  landlordId String
+  landlord   User   @relation("LandlordProperties", fields: [landlordId], references: [id])
+
+  // A property has many rentable rooms (could be one "Entire Unit" or many rooms)
+  rooms  Room[]
+  photos PropertyPhoto[]
+
+  @@index([landlordId])
+  @@index([isVerified, createdAt])
+}
+
+// ─── ROOM ─────────────────────────────────────────────────────────────────────
+// A rentable unit within a property. For single-unit lets (whole apartment),
+// the landlord creates one Room labelled "Entire Unit". For room-by-room
+// rentals (terrace house), there can be one Room per bedroom.
+//
+// This sits between Property and Tenancy, allowing:
+//   - Multiple rooms per property with different rents
+//   - One active tenancy per room (enforced at API level)
+//   - isAvailable flag that the API keeps in sync
+model Room {
+  id               String          @id @default(cuid())
+  label            String // Display name, e.g. "Master Room (Level 2)"
+  roomType         RoomType // MASTER, MEDIUM, SMALL, STUDIO, ENTIRE_UNIT
+  bathroomType     BathroomType // ATTACHED or SHARED
+  bathrooms        Int             @default(1)
+  rentAmount       Decimal         @db.Decimal(10, 2)
+  sizeSqFt         Int? // Optional square footage
+  floorLevel       Int? // Optional — which floor
+  furnishing       FurnishingLevel // FULLY_FURNISHED, PARTIALLY_FURNISHED, UNFURNISHED
+  maxOccupants     Int             @default(1)
+  wifiIncluded     Boolean         @default(false)
+  waterIncluded    Boolean         @default(false)
+  electricIncluded Boolean         @default(false)
+  genderPreference GenderPref      @default(ANY)
+  notes            String? // Free-text additional details
+  isAvailable      Boolean         @default(true)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  propertyId String
+  property   Property  @relation(fields: [propertyId], references: [id])
+  tenancies  Tenancy[]
+}
+
+enum RoomType {
+  MASTER // Largest room, usually with attached bathroom
+  MEDIUM // Mid-size room
+  SMALL // Single/small room
+  STUDIO // Self-contained with own kitchen area
+  ENTIRE_UNIT // Whole apartment/house let as one
+}
+
+enum BathroomType {
+  ATTACHED // Private bathroom inside the room
+  SHARED // Common bathroom shared with others
+}
+
+enum FurnishingLevel {
+  FULLY_FURNISHED // Bed, wardrobe, AC, desk — move-in ready
+  PARTIALLY_FURNISHED // Some items, typically wardrobe and fan/AC
+  UNFURNISHED // Empty room
+}
+
+enum GenderPref {
+  ANY
+  MALE_ONLY
+  FEMALE_ONLY
+}
+
+// ─── PROPERTY PHOTO ──────────────────────────────────────────────────────────
+model PropertyPhoto {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  publicId  String
+  caption   String?
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation("UploadedPropertyPhotos", fields: [uploadedById], references: [id])
+}
+
+// ─── TENANCY ─────────────────────────────────────────────────────────────────
+// The core entity — represents one rental agreement between a landlord
+// (via Room → Property) and a tenant.
+//
+// Lifecycle: INVITED → PENDING → ACTIVE → EXPIRED | TERMINATED
+// INVITED: landlord created it, tenant must accept before work begins.
+// PENDING: tenant accepted, but agreement not yet signed.
+// ACTIVE:  agreement signed — rent schedule generated, tenancy is live.
+model Tenancy {
+  id            String        @id @default(cuid())
+  startDate     DateTime
+  endDate       DateTime
+  monthlyRent   Decimal       @db.Decimal(10, 2)
+  depositAmount Decimal       @db.Decimal(10, 2)
+  status        TenancyStatus @default(INVITED)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // End-of-tenancy: renewal chain and termination metadata
+  renewalOfTenancyId String?
+  renewalOf          Tenancy?  @relation("TenancyRenewals", fields: [renewalOfTenancyId], references: [id])
+  renewalBy          Tenancy[] @relation("TenancyRenewals")
+  terminatedAt       DateTime?
+  terminatedReason   String?
+
+  // Future corporate-tenancy scaffolding. Current UI still assumes an
+  // individual lease party; these fields stay nullable until that flow exists.
+  leasePartyType            LeasePartyType @default(INDIVIDUAL)
+  companyName               String?
+  companyRegistrationNo     String?
+  authorizedSignatoryName   String?
+  authorizedSignatoryIC     String?
+  authorizedSignatoryRole   String?
+  authorizedSignatoryUserId String?
+
+  // Foreign key to Room (not Property directly — go through room.property for auth)
+  // onDelete: Restrict — explicit because we never want to lose historical tenancies.
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id], onDelete: Restrict)
+
+  tenantId                String
+  tenant                  User   @relation("TenantTenancies", fields: [tenantId], references: [id])
+  authorizedSignatoryUser User?  @relation("AuthorizedCorporateTenancies", fields: [authorizedSignatoryUserId], references: [id], onDelete: SetNull)
+
+  // Deposit payment tracking
+  depositStatus          DepositStatus @default(PENDING)
+  depositRejectionReason String?       @db.Text
+
+  agreement            Agreement?
+  rentPayments         RentPayment[]
+  messages             Message[]
+  conditionReports     ConditionReport[]
+  agreementPreferences AgreementPreferences?
+  depositRefund        DepositRefund?
+  depositProofs        DepositProof[]
+  coTenants            CoTenant[]
+  corporateOccupants   CorporateOccupant[]
+
+  @@index([tenantId])
+  @@index([roomId])
+  @@index([status])
+}
+
+// ─── CO-TENANT ────────────────────────────────────────────────────────────────
+// Additional named occupants on a tenancy. The primary tenant holds the system
+// account and signs the agreement; co-tenants are listed by name/IC only.
+model CoTenant {
+  id        String   @id @default(cuid())
+  name      String
+  icNumber  String?
+  phone     String?
+  createdAt DateTime @default(now())
+
+  tenancyId String
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+}
+
+model CorporateOccupant {
+  id           String                  @id @default(cuid())
+  tenancyId    String
+  tenancy      Tenancy                 @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  name         String
+  icNumber     String?
+  phone        String?
+  roleLabel    String?
+  linkedUserId String?
+  linkedUser   User?                   @relation("LinkedCorporateOccupancies", fields: [linkedUserId], references: [id], onDelete: SetNull)
+  status       CorporateOccupantStatus @default(UNLINKED)
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  @@index([tenancyId, status])
+  @@index([linkedUserId])
+}
+
+enum TenancyStatus {
+  INVITED // Landlord created — waiting for tenant to accept the invitation
+  PENDING // Tenant accepted — agreement being drafted/negotiated
+  ACTIVE // Agreement signed — tenancy is live
+  EXPIRED // Past the end date
+  TERMINATED // Ended early
+}
+
+enum LeasePartyType {
+  INDIVIDUAL
+  CORPORATE
+}
+
+enum CorporateOccupantStatus {
+  UNLINKED
+  LINKED
+  REPLACED
+  REMOVED
+}
+
+enum DepositStatus {
+  PENDING // Awaiting tenant to upload proof
+  UNDER_REVIEW // Proof uploaded; landlord reviewing
+  PAID // Landlord confirmed receipt
+  REJECTED // Landlord rejected proof; tenant must re-upload
+}
+
+// ─── AGREEMENT ───────────────────────────────────────────────────────────────
+model Agreement {
+  id                     String          @id @default(cuid())
+  rawContent             String          @db.Text
+  plainLanguageSummary   String          @db.Text
+  plainLanguageSummaryMs String?         @db.Text // Bahasa Malaysia version
+  redFlags               String?         @db.Text
+  redFlagsMs             String?         @db.Text // Bahasa Malaysia version
+  negotiationNotes       String?         @db.Text
+  negotiationRound       Int             @default(0)
+  status                 AgreementStatus @default(DRAFT)
+
+  contentHash        String? // SHA-256 hex digest of rawContent at signing time
+  signedAt           DateTime? // exact server-side timestamp of acceptance
+  signedByIp         String? // client IP — extracted from request headers
+  signedAcknowledged Boolean   @default(false) // true only after explicit modal consent
+
+  // Phase 14: Ethereum Sepolia testnet transaction hash.
+  // After signing, the contentHash is broadcast as transaction data to Sepolia.
+  // This txHash is the public, immutable on-chain proof that the document existed.
+  // Null until the blockchain transaction is successfully broadcast.
+  txHash String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenancyId String  @unique
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  events          AgreementEvent[]
+  revisions       AgreementRevision[]
+  changeRequests  AgreementChangeRequest[]
+  signatureProofs AgreementSignatureProof[]
+}
+
+enum AgreementStatus {
+  DRAFT // AI generated, landlord reviewing
+  FINALIZED // Landlord confirmed — awaiting tenant review
+  NEGOTIATING // Tenant requested changes — landlord needs to revise
+  PENDING_SIGNATURE_PROOF // Tenant signed digitally; hard-copy proof still pending approval
+  SIGNED // Tenant accepted
+}
+
+model AgreementSignatureProof {
+  id              String                        @id @default(cuid())
+  agreementId     String
+  agreement       Agreement                     @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  uploadedById    String
+  uploadedBy      User                          @relation("UploadedAgreementSignatureProofs", fields: [uploadedById], references: [id])
+  fileUrl         String
+  publicId        String
+  originalName    String
+  mimeType        String
+  fileSize        Int
+  status          AgreementSignatureProofStatus @default(UNDER_REVIEW)
+  rejectionReason String?                       @db.Text
+  reviewedById    String?
+  reviewedBy      User?                         @relation("ReviewedAgreementSignatureProofs", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  @@index([agreementId, createdAt])
+  @@index([agreementId, status])
+}
+
+enum AgreementSignatureProofStatus {
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+// ─── RENT PAYMENT ────────────────────────────────────────────────────────────
+// LATE status is intentionally not used — lateness is computed dynamically
+// by comparing dueDate < now() in the API/UI. This avoids needing a cron job.
+model RentPayment {
+  id              String        @id @default(cuid())
+  dueDate         DateTime
+  paidDate        DateTime?
+  amount          Decimal       @db.Decimal(10, 2)
+  status          PaymentStatus @default(PENDING)
+  notes           String?
+  rejectionReason String?       @db.Text
+  createdAt       DateTime      @default(now())
+
+  tenancyId String
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  proofs PaymentProof[]
+
+  @@index([tenancyId, dueDate])
+  @@index([status])
+}
+
+enum PaymentStatus {
+  PENDING // Due — treat as overdue in UI if dueDate < now()
+  UNDER_REVIEW // Proof uploaded, awaiting landlord
+  PAID // Landlord approved
+  LATE // Legacy value — no longer written; existing rows kept for safety
+  WAIVED // Landlord waived this payment
+}
+
+// ─── PAYMENT PROOF ───────────────────────────────────────────────────────────
+model PaymentProof {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  publicId  String
+  createdAt DateTime @default(now())
+
+  paymentId String
+  payment   RentPayment @relation(fields: [paymentId], references: [id])
+
+  uploadedById String
+  uploadedBy   User   @relation("UploadedProofs", fields: [uploadedById], references: [id])
+
+  @@index([paymentId, createdAt])
+  @@index([uploadedById])
+}
+
+// ─── CONDITION REPORT ────────────────────────────────────────────────────────
+model ConditionReport {
+  id             String          @id @default(cuid())
+  type           ReportType
+  notes          String?         @db.Text
+  status         ReportStatus    @default(DRAFT)
+  submittedAt    DateTime?
+  reviewDecision ReviewDecision?
+  reviewedAt     DateTime?
+  correctionNote String?         @db.Text
+  counterNote    String?         @db.Text
+  acknowledgedAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  tenancyId String
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   User   @relation("CreatedReports", fields: [createdById], references: [id])
+
+  acknowledgedById String?
+  acknowledgedBy   User?   @relation("AcknowledgedReports", fields: [acknowledgedById], references: [id])
+
+  reviewedById String?
+  reviewedBy   User?   @relation("ReviewedReports", fields: [reviewedById], references: [id])
+
+  photos         ConditionPhoto[]
+  checklistItems EvidenceChecklistItem[]
+
+  @@index([tenancyId, status])
+  @@index([createdById])
+}
+
+enum ReportType {
+  MOVE_IN
+  MOVE_OUT
+  INSPECTION
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  PENDING_REVIEW
+  CORRECTION_REQUESTED
+  COUNTER_EVIDENCE_ADDED
+  ACCEPTED
+  DISPUTED
+  LOCKED
+}
+
+enum ReviewDecision {
+  ACCEPTED
+  CORRECTION_REQUESTED
+  COUNTER_EVIDENCE_ADDED
+}
+
+enum ChecklistCompletionReason {
+  PHOTO_UPLOADED
+  NO_ISSUE_OBSERVED
+  NOT_APPLICABLE
+  CANNOT_ACCESS
+}
+
+// ─── CONDITION PHOTO ─────────────────────────────────────────────────────────
+model ConditionPhoto {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  publicId  String
+  room      String // Room/area label for this photo (e.g. "Kitchen")
+  caption   String?  @db.Text
+  createdAt DateTime @default(now())
+
+  reportId String
+  report   ConditionReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation("UploadedConditionPhotos", fields: [uploadedById], references: [id])
+}
+
+// ─── EVIDENCE CHECKLIST ──────────────────────────────────────────────────────
+model EvidenceChecklistItem {
+  id               String                    @id @default(cuid())
+  area             String
+  completionReason ChecklistCompletionReason
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  reportId String
+  report   ConditionReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, area])
+}
+
+// ─── MESSAGE ─────────────────────────────────────────────────────────────────
+model Message {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenancyId String
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  senderId String
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id])
+
+  receiverId String
+  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  // Hot paths: thread reads (by tenancy ordered by time) and unread counts (by receiver+read flag).
+  @@index([tenancyId, createdAt])
+  @@index([receiverId, read])
+}
+
+// ─── NOTIFICATION ────────────────────────────────────────────────────────────
+// In-app notification for a specific user about a lifecycle event. Persists
+// until the user marks it read. The index on (userId, readAt) makes the
+// unread-count query fast even with hundreds of historical reads per user.
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  body      String           @db.Text
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
+
+enum NotificationType {
+  INVITATION_RECEIVED
+  INVITATION_RESPONDED
+  AGREEMENT_READY
+  AGREEMENT_CHANGES_REQUESTED
+  AGREEMENT_SIGNED
+  AGREEMENT_SIGNATURE_PROOF_UPLOADED
+  AGREEMENT_SIGNATURE_PROOF_APPROVED
+  AGREEMENT_SIGNATURE_PROOF_REJECTED
+  PAYMENT_PROOF_UPLOADED
+  PAYMENT_APPROVED
+  PAYMENT_REJECTED
+  CONDITION_REPORT_CREATED
+  CONDITION_REPORT_ACKNOWLEDGED
+  CONDITION_REPORT_SUBMITTED
+  CONDITION_REPORT_CORRECTION_REQUESTED
+  CONDITION_REPORT_COUNTER_EVIDENCE
+  CONDITION_REPORT_ACCEPTED
+  CONDITION_REPORT_DISPUTED
+  DEPOSIT_DEDUCTION_FILED
+  DEPOSIT_REFUND_PAID
+  TENANCY_ENDING_SOON
+  MUTUAL_TERMINATION_PROPOSED
+  MUTUAL_TERMINATION_RESPONDED
+  DEPOSIT_PROOF_UPLOADED
+  DEPOSIT_PROOF_APPROVED
+  DEPOSIT_PROOF_REJECTED
+  ACCOUNT_VERIFIED
+  ACCOUNT_KYC_REJECTED
+  PROPERTY_VERIFICATION_APPROVED
+  PROPERTY_VERIFICATION_REJECTED
+  KYC_SUBMITTED
+  PROPERTY_SUBMITTED
+  ACCOUNT_VERIFICATION_REVOKED
+  PROPERTY_VERIFICATION_REVOKED
+  ACCOUNT_SUSPENDED
+  ACCOUNT_REACTIVATED
+}
+
+// ─── AGREEMENT PREFERENCES (WIZARD) ──────────────────────────────────────────
+// Captures the landlord's policy decisions from the 6-step wizard. These are
+// injected into the Gemini prompt so the generated agreement reflects explicit
+// choices rather than AI-invented defaults.
+model AgreementPreferences {
+  id        String  @id @default(cuid())
+  tenancyId String  @unique
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+
+  // Step 1 — House Rules and Occupancy
+  petsPolicy           String // "NONE"|"CATS_ONLY"|"DOGS_ONLY"|"APPROVAL"|"UNRESTRICTED"
+  petsMaxCount         Int?
+  petsDeposit          Decimal? @db.Decimal(10, 2)
+  smokingPolicy        String // "ANYWHERE"|"BALCONY_ONLY"|"NOT_INDOORS"|"NOT_ANYWHERE"
+  overnightGuests      String // "UNRESTRICTED"|"LIMITED"|"NOTIFICATION"|"NOT_ALLOWED"
+  overnightMaxNights   Int?
+  quietHoursPolicy     String // "STANDARD"|"CUSTOM"|"NONE"
+  quietHoursCustom     String?
+  additionalHouseRules String?  @db.Text
+
+  // Step 2 — Utilities and Services
+  utilityPaymentMethod   String // "DIRECT_TO_PROVIDER"|"REIMBURSE_LANDLORD"
+  utilityDisputeMethod   String // "OVER_TYPICAL"|"SPLIT_50_50"|"LANDLORD_FINAL"
+  internetProvider       String?
+  internetAccountManager String? // "LANDLORD"|"TENANT"|"SHARED"
+  acServicing            String // "LANDLORD_HANDLES_PAYS"|"LANDLORD_HANDLES_TENANT_PAYS"|"TENANT"
+  pestControl            String // same enum options as acServicing
+
+  // Step 3 — Financial Terms
+  rentDueDay               Int // 1 through 28
+  gracePeriodDays          Int // 0, 3, 7, or custom
+  latePenaltyType          String // "NONE"|"FLAT"|"PERCENTAGE"|"PER_DAY"
+  latePenaltyAmount        Decimal? @db.Decimal(10, 2)
+  acceptablePaymentMethods String // JSON array: ["BANK_TRANSFER","CASH","EWALLET"]
+  rentIncreaseTerms        String // "NO_INCREASE"|"FIXED_PERCENT"|"MUTUAL_AGREEMENT"
+  rentIncreasePercent      Decimal? @db.Decimal(5, 2)
+
+  // Step 4 — Maintenance and Repairs
+  minorRepairThreshold   Decimal @db.Decimal(10, 2)
+  minorRepairResponsible String // "TENANT"|"LANDLORD"|"SPLIT"|"DEPENDS"
+  plumbingResponsible    String
+  electricalResponsible  String
+  applianceResponsible   String
+  structuralResponsible  String
+  urgentResponseTime     String // "24H"|"48H"|"72H"|"7D"
+
+  // Step 5 — Ending the Tenancy
+  tenantNoticeMonths      Int
+  landlordNoticeMonths    Int // 0 = not allowed except for breach
+  earlyTerminationPenalty String // "NONE"|"FORFEIT_DEPOSIT"|"MONTHS_RENT"|"PRORATED"
+  earlyTerminationMonths  Int?
+  reinstatementLevel      String // "BROOM_CLEAN"|"PROFESSIONAL_CLEANING"|"ORIGINAL_STATE"|"AS_IS"
+  sublettingPolicy        String // "NOT_ALLOWED"|"WITH_CONSENT"|"WITHOUT_CONSENT"
+
+  // Step 6 — Deposit Handling
+  depositRefundDays      Int // 7, 14, 30, 60
+  deductionCategories    String // JSON array
+  disputeResolution      String // "PLATFORM_MESSAGING"|"MEDIATION"|"COURT"
+  utilityDepositHandling String // "COMBINED"|"SEPARATE"|"NONE"
+
+  // Progress tracking — allows saving partial wizard answers
+  completedSteps Int     @default(0) // highest step reached, 1 through 6
+  isComplete     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── DEPOSIT PROOF ───────────────────────────────────────────────────────────
+// Photo proof of deposit payment uploaded by tenant. Landlord approves/rejects.
+model DepositProof {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  publicId  String
+  createdAt DateTime @default(now())
+
+  tenancyId String
+  tenancy   Tenancy @relation(fields: [tenancyId], references: [id])
+
+  uploadedById String
+  uploadedBy   User   @relation("UploadedDepositProofs", fields: [uploadedById], references: [id])
+
+  @@index([tenancyId, createdAt])
+  @@index([uploadedById])
+}
+
+// ─── DEPOSIT REFUND ───────────────────────────────────────────────────────────
+// Deposit settlement workflow after tenancy ends. Landlord proposes deductions,
+// tenant reviews each one, and both reach AGREED before refund is paid.
+model DepositRefund {
+  id             String       @id @default(cuid())
+  tenancyId      String       @unique
+  tenancy        Tenancy      @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  originalAmount Decimal      @db.Decimal(10, 2)
+  refundAmount   Decimal      @db.Decimal(10, 2)
+  status         RefundStatus @default(PROPOSED)
+
+  paidProofUrl      String?
+  paidProofPublicId String?
+  paidAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deductions DepositDeduction[]
+}
+
+enum RefundStatus {
+  PROPOSED // Landlord submitted initial deductions
+  IN_REVIEW // Tenant reviewing, may dispute
+  AGREED // Both parties accepted; awaiting payment
+  DISPUTED // No agreement reached; parked for external resolution
+  PAID // Refund paid; tenancy fully closed
+}
+
+model DepositDeduction {
+  id                String          @id @default(cuid())
+  refundId          String
+  refund            DepositRefund   @relation(fields: [refundId], references: [id])
+  reason            String          @db.Text
+  amount            Decimal         @db.Decimal(10, 2)
+  status            DeductionStatus @default(PROPOSED)
+  tenantDisputeNote String?         @db.Text
+  photoIds          String          @db.Text // JSON array of ConditionPhoto IDs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum DeductionStatus {
+  PROPOSED // Landlord added; tenant hasn't reviewed
+  ACCEPTED // Tenant accepted
+  DISPUTED // Tenant contested
+  WITHDRAWN // Landlord removed
+}
+
+// ─── PASSWORD RESET TOKEN ─────────────────────────────────────────────────────
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  // Stores sha256(rawToken) — the raw token is sent in the email but never persisted.
+  // A DB leak therefore yields nothing exploitable: an attacker would need to
+  // pre-image the hash, which is computationally infeasible. The field is still
+  // @unique because identical hashes would indicate a hash collision (one in 2^256).
+  token     String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AgreementEvent {
+  id          String             @id @default(cuid())
+  agreementId String
+  agreement   Agreement          @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  type        AgreementEventType
+  actorRole   Role
+  actorUserId String?
+  summary     String
+  metadata    String?            @db.Text
+  createdAt   DateTime           @default(now())
+
+  @@index([agreementId, createdAt])
+}
+
+model AgreementRevision {
+  id                     String    @id @default(cuid())
+  agreementId            String
+  agreement              Agreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  versionNumber          Int
+  rawContent             String    @db.Text
+  plainLanguageSummary   String    @db.Text
+  plainLanguageSummaryMs String?   @db.Text
+  redFlags               String?   @db.Text
+  redFlagsMs             String?   @db.Text
+  createdByUserId        String?
+  createdAt              DateTime  @default(now())
+
+  @@unique([agreementId, versionNumber])
+}
+
+model AgreementChangeRequest {
+  id              String              @id @default(cuid())
+  agreementId     String
+  agreement       Agreement           @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  category        String
+  requestedChange String              @db.Text
+  reason          String              @db.Text
+  note            String?             @db.Text
+  status          ChangeRequestStatus @default(PENDING)
+  createdByUserId String
+  resolvedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([agreementId, status])
+}
+
+enum AgreementEventType {
+  GENERATED
+  EDITED
+  FINALIZED
+  REQUESTED_CHANGES
+  DIGITAL_SIGNED
+  SIGNATURE_PROOF_UPLOADED
+  SIGNATURE_PROOF_REJECTED
+  SIGNATURE_PROOF_APPROVED
+  SIGNED
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  RESOLVED
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+// Immutable record written before any hard delete. Stores a full JSON snapshot
+// of the deleted record so data can be reviewed or recovered by admins.
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String
+  actor        User     @relation("AuditLogActor", fields: [actorId], references: [id])
+  action       String // e.g. "USER_DELETED", "PROPERTY_DELETED", "ROOM_DELETED"
+  entityName   String // Prisma model name: "User", "Property", "Room", etc.
+  entityId     String // The deleted record's ID
+  previousData Json // Full snapshot of the record at time of deletion
+  ipAddress    String?
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  @@index([entityName, entityId])
+  @@index([actorId, createdAt])
+}
+
+// ─── KYC SUBMISSION ──────────────────────────────────────────────────────────
+// One submission per user. Resubmission (after REJECTED) upserts this record
+// and deletes old Cloudinary images. Admin reviews photos manually.
+model KycSubmission {
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation("UserKyc", fields: [userId], references: [id], onDelete: Cascade)
+
+  icFrontUrl      String
+  icFrontPublicId String
+  icBackUrl       String
+  icBackPublicId  String
+  selfieUrl       String
+  selfiePublicId  String
+
+  status         KycStatus @default(PENDING)
+  rejectedReason String?   @db.Text
+
+  reviewedById String?
+  reviewedBy   User?     @relation("KycReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+  submittedAt  DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, submittedAt])
+}
+
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}

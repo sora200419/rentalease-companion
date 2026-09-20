@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Room" ALTER COLUMN "roomType" DROP DEFAULT,
+ALTER COLUMN "bathroomType" DROP DEFAULT,
+ALTER COLUMN "furnishing" DROP DEFAULT;
