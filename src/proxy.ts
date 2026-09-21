@@ -1,7 +1,7 @@
 import { withAuth } from 'next-auth/middleware';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest, type NextFetchEvent } from 'next/server';
 
-export default withAuth(
+const authenticatedProxy = withAuth(
   function proxy(req) {
     const token = req.nextauth.token;
     const pathname = req.nextUrl.pathname;
@@ -65,6 +65,14 @@ export default withAuth(
 );
 
 export const config = {
-  // Cover dashboard routes + all API routes except NextAuth's own /api/auth/* endpoints
-  matcher: ['/dashboard/:path*', '/api/((?!auth/).*)'],
+  // Include auth endpoints so the offline mode can block all backend requests.
+  matcher: ['/dashboard/:path*', '/api/:path*'],
 };
+
+export default function proxy(req: NextRequest, event: NextFetchEvent) {
+  if (process.env.COMPANION_OFFLINE_DEMO === '1') {
+    return NextResponse.json({ error: 'Backend services are disabled in the offline companion demo.' }, { status: 503 });
+  }
+  if (req.nextUrl.pathname === '/api/auth' || req.nextUrl.pathname.startsWith('/api/auth/')) return NextResponse.next();
+  return (authenticatedProxy as (req: NextRequest, event: NextFetchEvent) => ReturnType<typeof authenticatedProxy>)(req, event);
+}

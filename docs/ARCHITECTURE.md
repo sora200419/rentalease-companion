@@ -2,6 +2,8 @@
 
 These are development decisions and proposals, not claims that integrations already exist.
 
+The first implemented milestone is the offline `/companion` prototype described in [DEMO.md](DEMO.md). Its pure domain functions use synthetic records and browser-local state. They exercise the interaction contract but are not connected to Prisma, real sessions, external models, or business APIs. Demo actors must never be accepted as production authorization.
+
 ## Retain the working foundation
 
 Keep Next.js, React, TypeScript, PostgreSQL/Prisma, and the existing account model. Runtime tenant/landlord permissions remain server-enforced. Do not replace these systems solely to add more technology names.

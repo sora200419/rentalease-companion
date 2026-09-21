@@ -2,7 +2,21 @@
 
 An evidence-based assistant for tenants and landlords completing a move-out and deposit settlement.
 
-**Status: project initialization.** This repository contains the imported RentalEase Malaysia final-year-project baseline and a plan for a new Alexa+ hackathon experience. The conversational assistant, agent tools, private evidence storage upgrade, and enhanced on-chain verification are **not implemented yet**.
+**Status: first offline interactive prototype.** The `/companion` experience now includes synthetic tenancy records, source-linked responses, tenant/landlord demo roles, explicitly confirmed disputes and withdrawals, and browser-local progress. Its assistant is deterministic and rule-based; live AI, production service integration, private evidence storage upgrades, and enhanced on-chain verification are **not implemented yet**. This is a development milestone, not the finished AI hackathon submission.
+
+## Try the zero-spend prototype
+
+After installing dependencies with `npm ci`, run:
+
+```sh
+npm run dev:companion
+```
+
+Open **http://127.0.0.1:3030/companion**. No `.env`, database, AWS credentials, or cloud services are needed for this experience. The dedicated command binds to loopback, disables inherited backend/dashboard routes, skips admin bootstrap, and avoids the login provider. Normal `npm run dev` retains the inherited application's authentication behavior.
+
+Choose **Compare evidence**, then **Prepare a dispute → Confirm dispute**. Switch to **Landlord**, choose **Review withdrawal → Confirm withdrawal**, and see the proposed refund update. Use **Reset / change demo scenario** to try disputed or missing move-in records. Refresh restores progress but requires a new confirmation for any unsubmitted draft.
+
+See the [demo walkthrough and limitations](docs/DEMO.md). Use one tab for the demo; its browser storage is not a multi-user backend.
 
 ## What we are building
 

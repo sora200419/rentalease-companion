@@ -8,7 +8,9 @@ The resources page links an application for $150 in AWS credits. Approval, accou
 
 ## No account needed for current checks
 
-`npm test` compiles the actual pure workflow helpers into a temporary directory and runs 12 regression tests using Node's built-in test runner. It needs no API keys, database, device, or additional package. It tests inherited behavior; it is not a completed assistant or end-to-end demo. In particular, report review helpers assume an already-authorized actor; route-level tenancy isolation remains to be tested.
+Owner decision (2026-09-21): zero-spend development. The owner may have a school-managed AWS account; ownership and post-graduation access are not yet confirmed. Do not provision potentially billable resources or make paid model calls. Credits do not override this constraint. Prefer local synthetic data, offline tests, and explicitly labelled mock providers until service eligibility and cost controls are verified and the owner approves any change.
+
+`npm test` compiles the pure workflow helpers and companion domain into a temporary directory and runs 22 regression tests using Node's built-in test runner. It needs no API keys, database, device, or additional package. The offline interactive prototype is available with `npm run dev:companion`; see [DEMO.md](DEMO.md). Production route-level tenancy isolation remains to be tested; fixture actor checks do not establish production security.
 
 ## Needed for the next integrated milestone
 
@@ -19,4 +21,4 @@ The resources page links an application for $150 in AWS credits. Approval, accou
 
 Ask the owner whether they have an AWS account, have applied for event credits, and prefer zero-spend development pending approval. Do not request account passwords or root keys in chat. Service credentials belong in local ignored environment files or a deployment secret store. Do not create paid resources without approval.
 
-Next implementation: synthetic development data and authorized evidence retrieval, followed by the assistant and explicit confirmed actions. Use English submission materials and clearly mark simulated records.
+Next implementation: authenticated server evidence retrieval and a real model provider, using the synthetic interaction prototype as the starting point. Use English submission materials and clearly mark simulated records.

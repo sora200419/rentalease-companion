@@ -8,6 +8,17 @@ Use synthetic records and clearly labelled demo photographs. Do not imply a reco
 
 ## 1. Reproducible baseline
 
+### Completed offline prototype (2026-09-21)
+
+- [x] Add a standalone `/companion` demo with synthetic roles and tenancy records.
+- [x] Show cited evidence and labelled room illustrations, including missing/disputed baseline variants.
+- [x] Implement rule-based conversation and confirmed, role-bound local actions with stale/retry checks.
+- [x] Persist demo progress in one browser; drop pending confirmations on refresh.
+- [x] Provide an offline launch mode that blocks inherited backend routes.
+- [x] Verify the full demo flow in the browser and add 10 companion domain tests (22 total).
+
+These are fixture-backed prototype features. The production integration items below remain open.
+
 - [x] Import the existing source without secrets.
 - [x] Separate schema migration from production build.
 - [x] Document setup, provenance, and planned work.
