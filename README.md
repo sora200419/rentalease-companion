@@ -2,7 +2,7 @@
 
 An evidence-based assistant for tenants and landlords completing a move-out and deposit settlement.
 
-**Status: local service prototype with an optional Ollama adapter.** The `/companion` experience includes synthetic records, cited responses, demo roles, server-checked confirmations and file-backed sessions. Rule mode is the default; an installed local Ollama model can be configured. Real inference has not yet been verified here. Production authentication/database integration, private evidence storage and blockchain upgrades remain planned. This is a development milestone, not the finished AI hackathon submission.
+**Status: experimental local-AI prototype.** The `/companion` experience includes synthetic records, cited responses, demo roles, server-checked confirmations and file-backed sessions. Real inference with local Qwen3 4B has been exercised; financial/action questions use authoritative rules. Chinese evidence quality still fails a strict evaluation case and falls back visibly. See [setup and evaluation findings](docs/LOCAL-MODEL.md). Production authentication/database integration, private evidence storage and blockchain upgrades remain planned. This is a development milestone, not the finished AI hackathon submission.
 
 ## Try the zero-spend prototype
 

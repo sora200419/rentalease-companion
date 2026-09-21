@@ -33,9 +33,14 @@ const withdrawn = await command(first.cookie, 'confirm', { revision: withdrawal.
 assert.equal(withdrawn.settlement.proposedRefundSen, 240000);
 assert.equal(withdrawn.state.status, 'WITHDRAWN');
 const chat = await command(second.cookie, 'chat', { revision: 0, question: 'Compare the wall evidence' });
-assert.equal(chat.state.entries.at(-1).provider, 'rules');
-assert.deepEqual(chat.state.entries.at(-1).sourceIds, ['IN-001', 'OUT-001', 'AGR-7']);
+const reply = chat.state.entries.at(-1);
+assert.ok(['rules', 'ollama'].includes(reply.provider));
+assert.ok(reply.sourceIds.length > 0);
+assert.ok(reply.sourceIds.every(id => ['IN-001', 'OUT-001', 'AGR-7'].includes(id)));
+assert.equal(chat.state.status, 'PROPOSED');
+assert.equal(chat.state.pending, null);
+if (process.env.COMPANION_REQUIRE_AI === '1') assert.equal(reply.provider, 'ollama');
 for (const path of ['/api/auth/session', '/api/deposit-refund', '/dashboard/tenant']) {
   assert.equal((await fetch(`${base}${path}`, { redirect: 'manual' })).status, 503);
 }
-console.log('PASS: session isolation, origin/body validation, stale/repeated confirmations, full settlement, rule chat, inherited API block.');
+console.log(`PASS: session isolation, origin/body validation, stale/repeated confirmations, full settlement, ${reply.provider} chat, inherited API block.`);

@@ -5,6 +5,8 @@
   "scripts": {
     "test": "node scripts/test-workflows.mjs",
     "test:companion:http": "node scripts/smoke-companion.mjs",
+    "model:serve": "node scripts/serve-local-model.mjs",
+    "model:evaluate": "node scripts/evaluate-local-model.mjs",
     "dev": "next dev",
     "dev:companion": "node scripts/dev-companion.mjs",
     "build": "prisma generate && next build",

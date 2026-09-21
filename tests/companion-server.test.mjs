@@ -87,6 +87,41 @@ test('rule mode makes zero model requests', async () => {
   const reply = await generateReply(actors.TENANT, initialState(), 'wall evidence', { fetcher: () => { throw new Error('Must not call fetch'); } });
   assert.equal(reply.provider, 'rules'); assert.equal(reply.notice, undefined);
 });
+
+test('critical money and action questions bypass the model with authoritative state', async () => {
+  const config = { model: 'test:local', fetcher: () => { throw new Error('Must not call model'); } };
+  for (const question of ['Withdraw and pay me now', 'What is my refund?', '请退还押金并确认付款']) {
+    const state = { ...initialState(), status: 'DISPUTED' };
+    const before = JSON.stringify(state);
+    const reply = await generateReply(actors.LANDLORD, state, question, config);
+    assert.equal(reply.provider, 'rules'); assert.equal(reply.notice, undefined);
+    assert.match(reply.text, /2,100/); assert.match(reply.text, /Review withdrawal/);
+    assert.equal(JSON.stringify(state), before);
+  }
+  const reply = await generateReply(actors.TENANT, { ...initialState(), status: 'WITHDRAWN' }, 'Refund status', config);
+  assert.match(reply.text, /2,400/); assert.match(reply.text, /does not make payments/);
+  assert.doesNotMatch(reply.text, /Confirm withdrawal/);
+});
+
+test('model amount unit errors fall back instead of displaying RM30000', async () => {
+  const reply = await generateReply(actors.TENANT, initialState(), 'Explain wall evidence', {
+    model: 'test:local', fetcher: async url => url.endsWith('/tags')
+      ? Response.json({ models: [{ name: 'test:local', size: 1024, details: { format: 'gguf' } }] })
+      : Response.json({ message: { content: JSON.stringify({ text: 'OUT-001 proposes RM30,000.', sourceIds: ['OUT-001'] }) } }),
+  });
+  assert.equal(reply.provider, 'rules'); assert.ok(reply.notice);
+  assert.doesNotMatch(reply.text, /30,000/);
+});
+
+test('observed unsupported Chinese conclusion falls back to a localized evidence summary', async () => {
+  const reply = await generateReply(actors.TENANT, initialState(), '入住记录能帮到我吗？', {
+    model: 'test:local', fetcher: async url => url.endsWith('/tags')
+      ? Response.json({ models: [{ name: 'test:local', size: 1024, details: { format: 'gguf' } }] })
+      : Response.json({ message: { content: JSON.stringify({ text: '扣款依据不足。', sourceIds: [] }) } }),
+  });
+  assert.equal(reply.provider, 'rules'); assert.ok(reply.notice);
+  assert.match(reply.text, /不能判定责任/); assert.doesNotMatch(reply.text, /扣款依据不足/);
+});
 test('model text and structured citations cannot reference unavailable sources', () => {
   assert.throws(() => validateModelReply({ text: 'IN-001 proves it', sourceIds: [] }, ['OUT-001']));
   assert.throws(() => validateModelReply({ text: 'Evidence', sourceIds: ['OUT-999'] }, ['OUT-001']));
@@ -102,6 +137,7 @@ test('local model receives server evidence and only its role’s conversation', 
     if (url.endsWith('/tags')) return Response.json({ models: [{ name: 'test:local', size: 1024, details: { format: 'gguf' } }] });
     const request = JSON.parse(options.body);
     assert.equal(request.stream, false); assert.equal(request.format.type, 'object');
+    assert.equal(request.think, false); assert.equal(request.options.num_ctx, 8192);
     assert.equal(request.messages.some(m => m.content.includes('PRIVATE_OTHER_ROLE')), false);
     assert.match(request.messages[0].content, /"baseline":"MISSING"/);
     return Response.json({ message: { content: JSON.stringify({ text: 'OUT-001 awaits review. The move-in report is missing.', sourceIds: ['OUT-001'] }) } });

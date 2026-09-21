@@ -24,7 +24,7 @@ Chat never submits or withdraws a deduction. Users must use the action buttons. 
 
 ## Optional local inference
 
-No local Ollama service was available during implementation. The adapter is tested with controlled responses; real model quality, performance and hardware compatibility have **not** been verified. The running page remains labelled **Rule-based mode**.
+Local Qwen3 4B is now installed and real inference has been exercised on the development computer. This remains experimental: the Chinese evaluation case triggers a safety fallback. See [LOCAL-MODEL.md](LOCAL-MODEL.md) for setup, measurements and unresolved quality findings.
 
 When a local model is available:
 
@@ -41,7 +41,7 @@ Valid JSON and citations do not prove accuracy. Real-model evaluation must check
 
 ## Verification (2026-09-22)
 
-- `npm test`: 34 tests cover workflows, persistence, session isolation, concurrent/stale writes, expiry, idempotency, role-specific model context, output validation and fallback.
-- `npm run test:companion:http`: requires the dedicated server on port 3030 in rule mode. Creates synthetic sessions and checks cookies, origin rejection, body limits, tampered commands, session isolation, dispute/withdrawal and inherited API blocking.
+- `npm test`: 37 tests cover workflows, persistence, session isolation, concurrent/stale writes, expiry, idempotency, role-specific model context, output validation and fallback.
+- `npm run test:companion:http`: requires the dedicated server on port 3030. Creates synthetic sessions and checks cookies, origin rejection, body limits, tampered commands, session isolation, dispute/withdrawal and inherited API blocking. Set `COMPANION_REQUIRE_AI=1` to require an actual model response; this mode was verified.
 - Browser verification covered cited chat, tenant confirmation, refreshed history, landlord withdrawal and refund values, without observed console errors.
-- Production authentication/database, real model inference and cloud integrations are not claimed as tested.
+- Production authentication/database and cloud integrations are not claimed as tested.

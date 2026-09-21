@@ -54,6 +54,7 @@ deployment/
 /uploads/
 /private-data/
 /.companion-data/
+/.local-runtime/
 *.key
 *.p12
 *.pfx
