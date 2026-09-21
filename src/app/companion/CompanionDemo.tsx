@@ -1,10 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { actors, confirmAction, getEvidence, getSettlementContext, initialState, money, prepareAction, replyTo, restoreState, tenancyId, type ActionKind, type DemoState, type Role, type Source } from '@/lib/companion/demo';
+import { actors, initialState, money, type ActionKind, type DemoState, type Role, type Source } from '@/lib/companion/demo';
 import styles from './companion.module.css';
 
-const STORAGE_KEY = 'rentalease-companion-demo-v1';
+type Snapshot = { revision: number; role: Role; state: DemoState; evidence: Source[];
+  settlement: { depositSen: number; proposedDeductionSen: number; proposedRefundSen: number };
+  configuredProvider: 'rules' | 'ollama'; notice?: string };
+let initializing: Promise<Snapshot> | undefined;
+async function readSession(resume = false): Promise<Snapshot> {
+  const response = await fetch('/api/companion/session', { cache: 'no-store' });
+  if (!response.ok) throw new Error('The local companion service is unavailable. Start it with npm run dev:companion.');
+  if (!resume) return response.json() as Promise<Snapshot>;
+  const resumed = await fetch('/api/companion/resume', { method: 'POST' });
+  if (!resumed.ok) throw new Error('Could not restore your demo session. Please reload.');
+  return resumed.json() as Promise<Snapshot>;
+}
 const statusLabels = { PROPOSED: 'Awaiting your review', DISPUTED: 'Dispute submitted', WITHDRAWN: 'Deduction withdrawn' };
 
 function RoomIllustration({ moveOut }: { moveOut: boolean }) {
@@ -33,56 +44,66 @@ export default function CompanionDemo() {
   const [state, setState] = useState<DemoState>(() => initialState());
   const [role, setRole] = useState<Role>('TENANT');
   const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [evidence, setEvidence] = useState<Source[]>([]);
+  const [context, setContext] = useState({ depositSen: 240000, proposedDeductionSen: 30000, proposedRefundSen: 210000 });
+  const [provider, setProvider] = useState<'rules' | 'ollama'>('rules');
   const [question, setQuestion] = useState('');
   const [error, setError] = useState('');
-  const [storageWarning, setStorageWarning] = useState('');
+  const [notice, setNotice] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
   const [baseline, setBaseline] = useState<DemoState['baseline']>('ACCEPTED');
   const conversation = useRef<HTMLDivElement>(null);
+  const requestRunning = useRef(false);
   const actor = actors[role];
-  const context = getSettlementContext(actor, tenancyId, state);
-  const evidence = getEvidence(actor, tenancyId, state);
   const messages = state.entries.filter(entry => entry.role === role);
 
+  function applySnapshot(value: Snapshot) {
+    setState(value.state); setRole(value.role); setRevision(value.revision);
+    setEvidence(value.evidence); setContext(value.settlement); setProvider(value.configuredProvider);
+    setNotice(value.notice ?? ''); setReady(true);
+  }
+
   useEffect(() => {
-    // One-time hydration from browser storage; the server cannot read this source.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    try { setState(restoreState(localStorage.getItem(STORAGE_KEY))); }
-    catch { setStorageWarning('Browser storage is unavailable. Progress will last only for this visit.'); }
-    setReady(true);
+    let active = true;
+    // Share only concurrent initialization, so React development checks do not create two sessions.
+    initializing ??= readSession(true).finally(() => { initializing = undefined; });
+    void initializing.then(value => { if (active) applySnapshot(value); }).catch(caught => {
+      if (active) setError(caught instanceof Error ? caught.message : 'Could not restore the session.');
+    });
+    return () => { active = false; };
   }, []);
-  useEffect(() => {
-    if (!ready) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, pending: null })); }
-    // Surface an external storage failure; do not retry the failed write here.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    catch { setStorageWarning('Progress could not be saved. Keep this tab open to continue.'); }
-  }, [state, ready]);
   useEffect(() => { conversation.current?.scrollTo({ top: conversation.current.scrollHeight, behavior: 'smooth' }); }, [state.entries, role]);
 
-  function ask(text: string) {
+  async function run(operation: string, payload: Record<string, unknown> = {}) {
+    if (!ready || requestRunning.current) return false;
+    requestRunning.current = true; setBusy(true); setError(''); setNotice('');
+    try {
+      const response = await fetch(`/api/companion/${operation}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision, ...payload }) });
+      const value = await response.json() as Snapshot & { error?: string };
+      if (!response.ok) {
+        if (response.status === 409 || response.status === 401) applySnapshot(await readSession());
+        throw new Error(value.error ?? 'The request failed. Please try again.');
+      }
+      applySnapshot(value); return true;
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Connection failed. Your action was not confirmed here. Refresh to check its status.'); return false; }
+    finally { requestRunning.current = false; setBusy(false); }
+  }
+  async function ask(text: string) {
     const clean = text.trim().slice(0, 1000);
     if (!clean || !ready) return;
-    setError(''); setQuestion('');
-    setState(current => {
-      const reply = replyTo(actor, current, clean);
-      let next = current;
-      if (reply.suggestedAction) next = prepareAction(current, actor, reply.suggestedAction, crypto.randomUUID());
-      return { ...next, entries: [...next.entries, { id: crypto.randomUUID(), role, speaker: 'USER' as const, text: clean, sourceIds: [] }, { id: crypto.randomUUID(), role, speaker: 'ASSISTANT' as const, text: reply.text, sourceIds: reply.sourceIds }].slice(-100) };
-    });
+    if (await run('chat', { question: clean })) setQuestion('');
   }
   function prepare(kind: ActionKind) {
-    setError('');
-    try { setState(prepareAction(state, actor, kind, crypto.randomUUID())); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not prepare this action.'); }
+    void run('prepare', { kind });
   }
   function confirm() {
     if (!state.pending) return;
-    try { setState(confirmAction(state, actor, state.pending.id)); setError(''); }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'Could not confirm this action.'); }
+    void run('confirm', { actionId: state.pending.id });
   }
   function switchRole(nextRole: Role) {
-    setRole(nextRole); setState(current => ({ ...current, pending: null })); setError(''); setQuestion('');
+    void run('role', { role: nextRole }).then(ok => { if (ok) setQuestion(''); });
   }
   function jumpToSource(id: string) {
     const element = document.getElementById(`source-${id}`);
@@ -102,12 +123,14 @@ export default function CompanionDemo() {
     <div className={styles.workspace}>
       <header className={styles.topbar}><span>Workspace <span className={styles.slash}>/</span> Move-out review</span><span className={styles.localBadge}><span /> Local demo · no cloud calls</span></header>
       <div className={styles.content}>
-        <div className={styles.demoNotice}>Alexa+ experience prototype <span>·</span> Synthetic records & illustrations <span>·</span> Rule-based assistant</div>
+        <div className={styles.demoNotice}>Alexa+ experience prototype <span>·</span> Synthetic records & illustrations <span>·</span> {provider === 'ollama' ? 'Local AI configured' : 'Rule-based assistant'}</div>
         <section id="case" className={styles.heading}>
           <div><div className={styles.eyebrow}>CASE RE–001 / SEPTEMBER 2026</div><h1>A fair finish.<br /><em>A clearer next step.</em></h1><p>Review the evidence. Resolve the deposit. Move forward.</p></div>
-          <div className={styles.roleSwitch}><span>Explore as</span><div role="group" aria-label="Demo role"><button aria-pressed={role === 'TENANT'} onClick={() => switchRole('TENANT')} disabled={!ready}>Tenant</button><button aria-pressed={role === 'LANDLORD'} onClick={() => switchRole('LANDLORD')} disabled={!ready}>Landlord</button></div></div>
+          <div className={styles.roleSwitch}><span>Explore as</span><div role="group" aria-label="Demo role"><button aria-pressed={role === 'TENANT'} onClick={() => switchRole('TENANT')} disabled={!ready || busy}>Tenant</button><button aria-pressed={role === 'LANDLORD'} onClick={() => switchRole('LANDLORD')} disabled={!ready || busy}>Landlord</button></div></div>
         </section>
-        {storageWarning && <p role="status" className={styles.warning}>{storageWarning}</p>}
+        {!ready && !error && <p role="status">Restoring your local session…</p>}
+        {error && <p role="alert" className={styles.warning}>{error}</p>}
+        {notice && <p role="status" className={styles.warning}>{notice}</p>}
         <section className={styles.summary} aria-label="Settlement summary">
           <div className={styles.property}><div className={styles.houseIcon} aria-hidden="true">⌂</div><div><span className={styles.eyebrow}>DEMO TENANCY · UNIT 08–12</span><h2>The Fern Residences</h2><p>Bedroom A · Kuala Lumpur</p></div></div>
           <div className={styles.metric}><span>Deposit held</span><strong>{money(context.depositSen)}</strong></div>
@@ -127,28 +150,27 @@ export default function CompanionDemo() {
               <div className={styles.evidenceGrid}>{evidence.filter(s => s.kind !== 'AGREEMENT').map(source => <SourceCard key={source.id} source={source} />)}{state.baseline === 'MISSING' && <div className={styles.missing}><strong>No move-in report</strong><p>No baseline observation can be made.</p></div>}</div>
               {evidence.filter(s => s.kind === 'AGREEMENT').map(source => <SourceCard key={source.id} source={source} />)}
             </section>
-            <section id="activity" className={styles.activity}><div className={styles.sectionHeading}><h2>Activity record</h2><span>Local to this browser</span></div><ol>{state.activity.map((item, index) => <li key={`${index}-${item}`}><span className={styles.activityDot} /><p>{item}</p></li>)}</ol></section>
+            <section id="activity" className={styles.activity}><div className={styles.sectionHeading}><h2>Activity record</h2><span>Saved on your computer</span></div><ol>{state.activity.map((item, index) => <li key={`${index}-${item}`}><span className={styles.activityDot} /><p>{item}</p></li>)}</ol></section>
           </div>
           <aside className={styles.assistant} aria-label="Move-out assistant">
             <div className={styles.assistantHeader}><span className={styles.assistantGlyph} aria-hidden="true">✳</span><div><h2>Your move-out companion</h2><span>Evidence first. You decide.</span></div></div>
-            <div className={styles.assistantMode}>OFFLINE PREVIEW <span>No live AI or photo analysis</span></div>
+            <div className={styles.assistantMode}>{provider === 'ollama' ? 'LOCAL AI · OLLAMA' : 'RULE-BASED MODE'} <span>{busy ? 'Processing your request…' : 'No cloud calls or photo analysis'}</span></div>
             <div className={styles.conversation} ref={conversation} role="log" aria-label="Conversation" aria-live="polite">
               <div className={styles.assistantMessage}><span className={styles.messageLabel}>COMPANION</span><p>{role === 'TENANT' ? 'Let’s take a closer look at the RM300 wall deduction. I can bring together the records and help you prepare a response.' : 'You can review the tenant’s response and the linked records, then decide whether to withdraw the deduction.'}</p><p className={styles.messageAside}>This demo organizes evidence. It does not decide legal responsibility.</p></div>
-              {messages.map(entry => <div key={entry.id} className={entry.speaker === 'USER' ? styles.userMessage : styles.assistantMessage}><span className={styles.messageLabel}>{entry.speaker === 'USER' ? actor.name : 'COMPANION'}</span><p>{entry.text}</p>{entry.sourceIds.length > 0 && <div className={styles.citations}>{entry.sourceIds.map(id => <button key={id} onClick={() => jumpToSource(id)} aria-label={`View source ${id}`}>{id} ↗</button>)}</div>}</div>)}
+              {messages.map(entry => <div key={entry.id} className={entry.speaker === 'USER' ? styles.userMessage : styles.assistantMessage}><span className={styles.messageLabel}>{entry.speaker === 'USER' ? actor.name : entry.provider === 'ollama' ? 'COMPANION · LOCAL AI' : 'COMPANION · RULE-BASED'}</span><p>{entry.text}</p>{entry.sourceIds.length > 0 && <div className={styles.citations}>{entry.sourceIds.map(id => <button key={id} onClick={() => jumpToSource(id)} aria-label={`View source ${id}`}>{id} ↗</button>)}</div>}</div>)}
             </div>
-            <div className={styles.suggestions}><button disabled={!ready} onClick={() => ask('Compare the wall evidence')}>Compare evidence ↗</button><button disabled={!ready} onClick={() => ask('What is my deposit status?')}>Check deposit ↗</button></div>
-            <form className={styles.composer} onSubmit={event => { event.preventDefault(); ask(question); }}><label htmlFor="companion-question" className={styles.srOnly}>Ask about the demo settlement</label><input id="companion-question" value={question} onChange={event => setQuestion(event.target.value)} maxLength={1000} placeholder="Ask about this deduction…" disabled={!ready} /><button aria-label="Send message" disabled={!ready || !question.trim()} type="submit">↑</button></form>
+            <div className={styles.suggestions}><button disabled={!ready || busy} onClick={() => { void ask('Compare the wall evidence'); }}>Compare evidence ↗</button><button disabled={!ready || busy} onClick={() => { void ask('What is my deposit status?'); }}>Check deposit ↗</button></div>
+            <form className={styles.composer} onSubmit={event => { event.preventDefault(); void ask(question); }}><label htmlFor="companion-question" className={styles.srOnly}>Ask about the demo settlement</label><input id="companion-question" value={question} onChange={event => setQuestion(event.target.value)} maxLength={1000} placeholder="Ask about this deduction…" disabled={!ready || busy} /><button aria-label="Send message" disabled={!ready || busy || !question.trim()} type="submit">↑</button></form>
             <div className={styles.actionArea}>
-              {error && <p role="alert" className={styles.warning}>{error}</p>}
-              {state.pending ? <div className={styles.confirmation} aria-label="Review action before confirming"><span className={styles.eyebrow}>REVIEW BEFORE CONFIRMING</span><h3>{state.pending.kind === 'DISPUTE' ? 'Submit this dispute?' : 'Withdraw this deduction?'}</h3><p>{state.pending.draft}</p><small>Acts as {actor.name}. Updates this local demo only.</small><div className={styles.confirmButtons}><button onClick={() => setState(current => ({ ...current, pending: null }))}>Cancel</button><button className={styles.primaryButton} onClick={confirm}>{state.pending.kind === 'DISPUTE' ? 'Confirm dispute' : 'Confirm withdrawal'}</button></div></div>
+              {state.pending ? <div className={styles.confirmation} aria-label="Review action before confirming"><span className={styles.eyebrow}>REVIEW BEFORE CONFIRMING</span><h3>{state.pending.kind === 'DISPUTE' ? 'Submit this dispute?' : 'Withdraw this deduction?'}</h3><p>{state.pending.draft}</p><small>Acts as {actor.name}. Local demo only. Confirmation expires after 5 minutes.</small><div className={styles.confirmButtons}><button disabled={busy} onClick={() => { void run('cancel'); }}>Cancel</button><button disabled={busy} className={styles.primaryButton} onClick={confirm}>{state.pending.kind === 'DISPUTE' ? 'Confirm dispute' : 'Confirm withdrawal'}</button></div></div>
                 : state.status === 'WITHDRAWN' ? <div className={styles.complete}><strong>Ready for the next chapter.</strong><p>The deduction is withdrawn. Proposed refund: RM2,400. Payment remains a separate step.</p></div>
                   : role === 'TENANT' && state.status === 'DISPUTED' ? <div className={styles.complete}><strong>Your response is recorded.</strong><p>Switch to the landlord demo profile to review the dispute.</p></div>
-                    : <><p>Nothing is submitted until you confirm.</p><button className={styles.primaryButton} disabled={!ready} onClick={() => prepare(role === 'TENANT' ? 'DISPUTE' : 'WITHDRAW')}>{role === 'TENANT' ? 'Prepare a dispute' : 'Review withdrawal'} <span aria-hidden="true">→</span></button></>}
+                    : <><p>Nothing is submitted until you confirm.</p><button className={styles.primaryButton} disabled={!ready || busy} onClick={() => prepare(role === 'TENANT' ? 'DISPUTE' : 'WITHDRAW')}>{role === 'TENANT' ? 'Prepare a dispute' : 'Review withdrawal'} <span aria-hidden="true">→</span></button></>}
             </div>
           </aside>
         </div>
-        <footer className={styles.footer}><p>RentalEase Companion · Independent Alexa+ simulation prototype</p><button onClick={() => { setBaseline(state.baseline); setResetOpen(true); }} disabled={!ready}>Reset / change demo scenario</button></footer>
-        {resetOpen && <section className={styles.resetPanel} aria-label="Reset demo confirmation"><h2>Start a fresh demo</h2><p>This clears only this demo’s conversation and actions in this browser.</p><label htmlFor="baseline">Move-in baseline</label><select id="baseline" value={baseline} onChange={event => setBaseline(event.target.value as DemoState['baseline'])}><option value="ACCEPTED">Accepted report</option><option value="DISPUTED">Disputed report</option><option value="MISSING">Missing report</option></select><div className={styles.confirmButtons}><button onClick={() => setResetOpen(false)}>Keep current demo</button><button className={styles.primaryButton} onClick={() => { setState(initialState(baseline)); setRole('TENANT'); setQuestion(''); setError(''); setResetOpen(false); }}>Reset demo</button></div></section>}
+        <footer className={styles.footer}><p>RentalEase Companion · Independent Alexa+ simulation prototype</p><button onClick={() => { setBaseline(state.baseline); setResetOpen(true); }} disabled={!ready || busy}>Reset / change demo scenario</button></footer>
+        {resetOpen && <section className={styles.resetPanel} aria-label="Reset demo confirmation"><h2>Start a fresh demo</h2><p>This clears the conversation and actions in your current demo session.</p><label htmlFor="baseline">Move-in baseline</label><select id="baseline" value={baseline} onChange={event => setBaseline(event.target.value as DemoState['baseline'])} disabled={busy}><option value="ACCEPTED">Accepted report</option><option value="DISPUTED">Disputed report</option><option value="MISSING">Missing report</option></select><div className={styles.confirmButtons}><button disabled={busy} onClick={() => setResetOpen(false)}>Keep current demo</button><button disabled={busy} className={styles.primaryButton} onClick={() => { void run('reset', { baseline }).then(ok => { if (ok) { setQuestion(''); setResetOpen(false); } }); }}>Reset demo</button></div></section>}
       </div>
     </div>
   </main>;

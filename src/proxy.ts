@@ -71,6 +71,7 @@ export const config = {
 
 export default function proxy(req: NextRequest, event: NextFetchEvent) {
   if (process.env.COMPANION_OFFLINE_DEMO === '1') {
+    if (/^\/api\/companion\/(session|resume|role|reset|prepare|confirm|cancel|chat)$/.test(req.nextUrl.pathname)) return NextResponse.next();
     return NextResponse.json({ error: 'Backend services are disabled in the offline companion demo.' }, { status: 503 });
   }
   if (req.nextUrl.pathname === '/api/auth' || req.nextUrl.pathname.startsWith('/api/auth/')) return NextResponse.next();

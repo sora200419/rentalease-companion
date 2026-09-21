@@ -10,7 +10,7 @@ The resources page links an application for $150 in AWS credits. Approval, accou
 
 Owner decision (2026-09-21): zero-spend development. The owner may have a school-managed AWS account; ownership and post-graduation access are not yet confirmed. Do not provision potentially billable resources or make paid model calls. Credits do not override this constraint. Prefer local synthetic data, offline tests, and explicitly labelled mock providers until service eligibility and cost controls are verified and the owner approves any change.
 
-`npm test` compiles the pure workflow helpers and companion domain into a temporary directory and runs 22 regression tests using Node's built-in test runner. It needs no API keys, database, device, or additional package. The offline interactive prototype is available with `npm run dev:companion`; see [DEMO.md](DEMO.md). Production route-level tenancy isolation remains to be tested; fixture actor checks do not establish production security.
+`npm test` runs 34 workflow/domain/service tests. `npm run test:companion:http` checks a running local service with synthetic sessions. Neither needs keys or cloud services. See [LOCAL-SERVER.md](LOCAL-SERVER.md) for persistence and the optional Ollama adapter. No local model was available for real inference testing. Production isolation still requires real account integration.
 
 ## Needed for the next integrated milestone
 

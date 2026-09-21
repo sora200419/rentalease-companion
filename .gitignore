@@ -53,6 +53,7 @@ deployment/
 # Private runtime material and local exports.
 /uploads/
 /private-data/
+/.companion-data/
 *.key
 *.p12
 *.pfx

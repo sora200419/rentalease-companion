@@ -19,6 +19,17 @@ Use synthetic records and clearly labelled demo photographs. Do not imply a reco
 
 These are fixture-backed prototype features. The production integration items below remain open.
 
+### Completed local service milestone (2026-09-22)
+
+- [x] Move demo state, role selection, evidence and confirmed actions behind a local session API.
+- [x] Add file persistence, input/origin checks, revision conflicts, expiry and retry handling.
+- [x] Connect the UI to role-specific server history and visible request errors.
+- [x] Add an optional local Ollama adapter with validated citations and visible rule fallback.
+- [x] Pass 34 tests plus actual HTTP and browser workflow checks.
+- [ ] Install/select a local model after a hardware review, then evaluate real inference.
+
+Real-user authentication and database tenancy checks remain separate integration work; the local service uses synthetic identities.
+
 - [x] Import the existing source without secrets.
 - [x] Separate schema migration from production build.
 - [x] Document setup, provenance, and planned work.

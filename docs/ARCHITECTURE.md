@@ -2,7 +2,7 @@
 
 These are development decisions and proposals, not claims that integrations already exist.
 
-The first implemented milestone is the offline `/companion` prototype described in [DEMO.md](DEMO.md). Its pure domain functions use synthetic records and browser-local state. They exercise the interaction contract but are not connected to Prisma, real sessions, external models, or business APIs. Demo actors must never be accepted as production authorization.
+The `/companion` prototype now uses the [local session service](LOCAL-SERVER.md): synthetic records, file-backed state and a server-held demo role. An optional Ollama adapter is tested with controlled responses, not a real model. Prisma and real account authentication are not yet connected; demo actors must never be accepted as production authorization.
 
 ## Retain the working foundation
 

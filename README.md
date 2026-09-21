@@ -2,7 +2,7 @@
 
 An evidence-based assistant for tenants and landlords completing a move-out and deposit settlement.
 
-**Status: first offline interactive prototype.** The `/companion` experience now includes synthetic tenancy records, source-linked responses, tenant/landlord demo roles, explicitly confirmed disputes and withdrawals, and browser-local progress. Its assistant is deterministic and rule-based; live AI, production service integration, private evidence storage upgrades, and enhanced on-chain verification are **not implemented yet**. This is a development milestone, not the finished AI hackathon submission.
+**Status: local service prototype with an optional Ollama adapter.** The `/companion` experience includes synthetic records, cited responses, demo roles, server-checked confirmations and file-backed sessions. Rule mode is the default; an installed local Ollama model can be configured. Real inference has not yet been verified here. Production authentication/database integration, private evidence storage and blockchain upgrades remain planned. This is a development milestone, not the finished AI hackathon submission.
 
 ## Try the zero-spend prototype
 
@@ -12,11 +12,11 @@ After installing dependencies with `npm ci`, run:
 npm run dev:companion
 ```
 
-Open **http://127.0.0.1:3030/companion**. No `.env`, database, AWS credentials, or cloud services are needed for this experience. The dedicated command binds to loopback, disables inherited backend/dashboard routes, skips admin bootstrap, and avoids the login provider. Normal `npm run dev` retains the inherited application's authentication behavior.
+Open **http://127.0.0.1:3030/companion**. No `.env`, database, AWS credentials, or cloud services are needed for rule mode. The command binds to loopback, enables only the local companion service, blocks inherited APIs/dashboard routes, skips admin bootstrap and avoids the login provider. Normal `npm run dev` retains the inherited application's authentication behavior.
 
 Choose **Compare evidence**, then **Prepare a dispute → Confirm dispute**. Switch to **Landlord**, choose **Review withdrawal → Confirm withdrawal**, and see the proposed refund update. Use **Reset / change demo scenario** to try disputed or missing move-in records. Refresh restores progress but requires a new confirmation for any unsubmitted draft.
 
-See the [demo walkthrough and limitations](docs/DEMO.md). Use one tab for the demo; its browser storage is not a multi-user backend.
+See the [walkthrough](docs/DEMO.md) and [local service, model setup and limitations](docs/LOCAL-SERVER.md). Sessions are stored in the ignored `.companion-data/` directory. Use one server process; stale tabs must refresh before writing. Previous browser-only records are not imported.
 
 ## What we are building
 

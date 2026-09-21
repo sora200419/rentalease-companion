@@ -1,17 +1,19 @@
 # Offline companion walkthrough
 
+Updated: the local service replaces browser-only storage. See [LOCAL-SERVER.md](LOCAL-SERVER.md) for the current session architecture, optional Ollama adapter and verification.
+
 ## Start
 
 Install the locked dependencies, then run `npm run dev:companion`. Visit http://127.0.0.1:3030/companion. No database, cloud account, or secret is needed. Stop with Ctrl+C.
 
-This command enables `COMPANION_OFFLINE_DEMO=1`. The root layout skips admin bootstrap and the authentication session provider. The proxy rejects all `/api/*` and `/dashboard/*` requests with 503 in this mode, including inherited authentication APIs. Without this flag, the normal application's authentication rules continue to apply.
+This command enables `COMPANION_OFFLINE_DEMO=1`. The layout skips admin bootstrap and the authentication provider. Defined `/api/companion/*` operations are allowed; inherited APIs and dashboards return 503. Outside this mode, normal authentication applies and the companion service returns 404.
 
 ## Happy path
 
 1. Start as tenant Aina. A synthetic RM2,400 deposit has a proposed RM300 wall deduction.
 2. Select **Compare evidence**. The response references IN-001, OUT-001 and AGR-7. Select a reference to focus the source card.
 3. Select **Prepare a dispute**. Nothing changes yet. Review the text and select **Confirm dispute**. The status changes to disputed and the activity record adds the tenant's response.
-4. Refresh. Business state and the role-specific conversation are restored. Pending confirmations are deliberately discarded, and the page opens as the tenant.
+4. Refresh. Business state, the current demo role and its conversation are restored from the local server. Pending confirmations are discarded.
 5. Switch to landlord Daniel. Read the shared activity record, then select **Review withdrawal** and **Confirm withdrawal**.
 6. The proposed deduction becomes RM0 and the proposed refund becomes RM2,400. The UI never claims that a payment happened.
 
@@ -24,10 +26,10 @@ Cancelling a draft, changing role, or refreshing does not submit an action. Only
 ## Scope and limitations
 
 - All people, records and clause text are synthetic. The room images are labelled SVG illustrations, not uploaded or AI-inspected photos.
-- Responses use a small deterministic intent matcher. Unknown questions explain the supported operations; no model API or image analysis is called. This is not yet a complete AI-backed Alexa+ simulation.
+- Default responses use a deterministic intent matcher. Optional Ollama inference is implemented but has not been verified with a real model here. No image analysis is performed.
 - Demo role switching is not authentication. Fixture access checks exercise role/record boundaries, but are not a substitute for authenticated, server-enforced authorization.
-- Data stays in this origin's `localStorage` under `rentalease-companion-demo-v1`. Browser data can be edited by the user. Never store real tenant information here.
-- Use a single tab: changes are not synchronized between tabs, devices, or real users. Financial calculations are in integer sen for the fixed MYR fixture, not a complete settlement engine.
+- Data is saved under `.companion-data/` on the local server, with a session cookie in the browser. Old localStorage records remain untouched but are no longer read. Never use real tenant information here.
+- Tabs share a session; stale writes are rejected and fetch current state for review. Changes are not pushed live to other tabs. Calculations use integer sen for the fixed MYR fixture, not a complete settlement engine.
 - No database schema, original tenant record, email, payment, signature, wallet, or cloud resource is changed. No private storage or blockchain confirmation flow is included yet.
 
 ## Verification on 2026-09-21

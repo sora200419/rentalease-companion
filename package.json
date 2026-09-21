@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "test": "node scripts/test-workflows.mjs",
+    "test:companion:http": "node scripts/smoke-companion.mjs",
     "dev": "next dev",
     "dev:companion": "node scripts/dev-companion.mjs",
     "build": "prisma generate && next build",

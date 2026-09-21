@@ -17,7 +17,7 @@ export const sources: Source[] = [
   { id: 'AGR-7', tenancyId, title: 'Agreement · clause 7', kind: 'AGREEMENT', date: '2025-10-01', status: 'ACCEPTED', text: 'Synthetic demonstration clause: any proposed damage deduction should identify the damage and supporting evidence. Pre-existing marks and fair wear should be considered during the parties’ review.' },
 ];
 export type PendingAction = { id: string; kind: ActionKind; actorId: string; version: number; draft: string };
-export type Entry = { id: string; role: Role; speaker: 'USER' | 'ASSISTANT'; text: string; sourceIds: string[] };
+export type Entry = { id: string; role: Role; speaker: 'USER' | 'ASSISTANT'; text: string; sourceIds: string[]; provider?: 'rules' | 'ollama' };
 export type DemoState = {
   schema: 1; version: number; status: 'PROPOSED' | 'DISPUTED' | 'WITHDRAWN';
   baseline: 'ACCEPTED' | 'DISPUTED' | 'MISSING'; pending: PendingAction | null;
