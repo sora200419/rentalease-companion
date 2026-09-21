@@ -15,6 +15,8 @@ Use synthetic records and clearly labelled demo photographs. Do not imply a reco
 - [ ] Run the app against an isolated database and test service accounts.
 - [ ] Add a repeatable synthetic dataset with tenant and landlord demo roles.
 - [ ] Establish targeted tests for record access, settlement calculations, and state transitions.
+  - [x] Add 12 offline regression tests for inherited settlement/review transitions and evidence comparison.
+  - [ ] Add server authorization, monetary calculation, and database integration tests. Pure helper tests do not prove tenancy access control.
 
 ## 2. Evidence retrieval
 

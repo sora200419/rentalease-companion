@@ -53,6 +53,7 @@ The development URL is `http://localhost:3000`. There are no pre-created demo ac
 
 ```sh
 npm run db:generate
+npm test
 npm run typecheck
 npm run lint
 npm run build
