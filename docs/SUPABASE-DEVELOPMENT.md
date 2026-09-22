@@ -55,11 +55,33 @@ Verified: four tenant/landlord logins, wrong password, CSRF/origin rejection, ow
 
 ## Remaining implementation
 
+### Confirmed submissions milestone (2026-09-23)
+
+The owner explicitly approved development-database writes for report submission and dispute handling. Migration `20260923000100_records_confirmed_submissions` adds `RecordsRevision`, append-only `RecordsActionEvent`, and the narrowly scoped `records_submit` function. It was applied with `node scripts/deploy-records-writes.mjs`, which refuses unexpected pending/failed migrations. Do not edit an already-applied migration or reset the database to rerun it.
+
+The existing `rentalease_reader` credential now additionally has EXECUTE on this function and SELECT on the two new history/revision tables. Despite its historical name, it can therefore perform the following controlled writes. It still has **no direct table INSERT, UPDATE or DELETE permissions**. Function EXECUTE is revoked from PUBLIC, `anon` and `authenticated`. Both new tables have RLS and no public Data API read access.
+
+- REPORT: either fixture tenancy party can append a new text-only MOVE_IN/MOVE_OUT/INSPECTION report with SUBMITTED status. Existing reports are not replaced or automatically accepted.
+- DISPUTE: only the fixture tenant can dispute a PROPOSED deduction in an open settlement. Deduction and settlement become DISPUTED; the reason is retained in history and the current dispute-note field. No deposit, deduction or refund amount changes.
+- RESPONSE: only the fixture landlord can append a reply referencing an existing dispute in the same tenancy. The reply does not resolve, approve or withdraw the dispute.
+
+Writes are explicitly allowlisted to the two existing synthetic tenancies and four synthetic users. The SECURITY DEFINER function checks persisted role, suspension/deletion and ownership. The backend must still supply a verified session ID; this is a trusted server function, not end-user identity/RLS isolation. Never expose the database credential, give it to browsers, or broaden the fixture allowlist for production without a new authorization/security review.
+
+`POST /api/records/[tenancyId]/actions` has separate prepare and confirm operations. Prepare rechecks access and returns an HMAC-signed preview bound to the actor, tenancy, content, revision and unique operation ID, expiring after ten minutes; it writes nothing. Confirm requires the signed token and explicit confirmation. The database locks the tenancy revision row and commits the business change, history and revision together. Identical retries return the original receipt; altered payloads, wrong actors and stale revisions fail. This revision mechanism covers this workspace's writes; administrative/out-of-band changes must not be run concurrently with user testing. The function independently checks dispute status at execution.
+
+The UI shows a persistent receipt, latest 50 historical submissions and exact confirmation consequences. Failed/uncertain responses keep the same confirmation available for retry. Cancelling the preview does not write; it is not server-side revocation of a copied token. Refresh/sign-out drops the UI preview. Already committed history remains. The app provides no edit/delete of submitted reports/history. Database administrators still retain their normal privileges; this is not an immutable external audit ledger.
+
+`npm run test:records:writes` performs real synthetic writes and intentionally retains them. It verifies anonymous/cross-tenant/origin refusal, actor/amount injection refusal, no-write preview, explicit confirmation, altered signatures, concurrent duplicate requests, stale rejection, report visibility to the other party, tenant-only disputes, landlord-only replies, unchanged amounts and denied direct-table/public-function access. Repeat runs append labelled test reports/replies but do not reset the dispute. Pure tests additionally cover expiry and role/state rules. No files/photos, bank operations, financial approvals or real personal data are involved.
+
+### Next implementation work
+
+Verification for this milestone: 57 workflow/unit tests, two configuration tests, type checking and changed-file lint passed. Live read/write integration checks passed. A browser-submitted synthetic inspection report returned a Supabase receipt and remained in submission history after a full page reload. The existing English cream/green UI was retained, with a separate preview/confirmation panel and history section.
+
 - Apply future reviewed migrations without reset or destructive schema synchronization.
 - Harden the development backend-role design before any public deployment or real-user data. Never use the administrative migration account as the application credential.
 - Keep synthetic fixtures separate from real user data; expand suspended/deleted-user and role-change integration tests.
 - Expand local source-selection relevance evaluation beyond the two synthetic tenancies; do not reuse fixed demo facts. Keep the offline demo separate.
-- Preserve explicit confirmation, transaction/revision safety and idempotency for writes.
+- Extend the confirmed workflow only with explicit action semantics; retain transaction/revision safety and idempotency. Photo storage and dispute resolution/withdrawal remain separate work.
 - Evaluate English answers against retrieved records, including missing evidence and adversarial follow-ups. No claim of complete factual accuracy yet.
 
 Connection settings do not automatically enforce tenant isolation. Database roles, RLS where applicable, and server authorization must be tested before real records are introduced.

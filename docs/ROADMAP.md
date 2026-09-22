@@ -57,6 +57,14 @@ The local demo service uses synthetic identities. The separate Supabase records 
 
 ## 2. Evidence retrieval
 
+### Confirmed Supabase submissions (2026-09-23)
+
+- [x] Apply owner-approved, fixture-scoped submission function; keep arbitrary table writes and deletes denied.
+- [x] Add signed, expiring, actor-bound previews and explicit confirmation.
+- [x] Persist submitted text reports, tenant disputes and landlord replies with append-only history.
+- [x] Verify concurrent idempotency, stale revisions, cross-tenancy/role checks and unchanged amounts with live integration tests.
+- [ ] Add private photo/file storage and explicit dispute resolution/withdrawal semantics. Replies currently do not resolve disputes.
+
 - [ ] Extract authorized business services from route handlers.
 - [ ] Implement `getSettlementContext`, `getDeductionEvidence`, and `getRelevantAgreementClauses`.
 - [ ] Return source IDs and status alongside every evidence item.

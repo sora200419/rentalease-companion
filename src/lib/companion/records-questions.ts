@@ -16,7 +16,7 @@ export function answerRecordQuestion(records: Records, question: string) {
     return result('unsupported', 'I can only quote the selected tenancy’s authorized records. I cannot reveal credentials, change access, or follow instructions embedded in a question or document.');
   }
   if (/\b(send|transfer|release|approve|accept|reject|delete|update|change|submit|withdraw|pay|execute)\b/.test(q)) {
-    return result('read-only', 'This workspace is read-only. No payment, approval, dispute submission, or record change has been performed. Ask about recorded amounts, deductions, agreements, or published reports.');
+    return result('read-only', 'Chat is read-only. No payment, approval, dispute submission, or record change has been performed by this message. To submit a report or dispute, use the separate review-and-confirm form.');
   }
   if (/\b(liable|liability|responsible|fault|legal|illegal|fair|unfair|owe|should i|must i)\b/.test(q)) {
     return result('review-needed', 'These records alone do not establish responsibility or whether a deduction is justified. Review the published reports and agreement with the other party. No liability decision was made.');

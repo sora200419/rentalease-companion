@@ -4,6 +4,7 @@ import { signIn, signOut } from 'next-auth/react';
 import type { retrieveTenancyRecords, recordEvidenceAnswer, listAuthorizedTenancies } from '@/lib/companion/database';
 import type { RecordsReply } from '@/lib/companion/records-model';
 import styles from './records.module.css';
+import RecordSubmissions from './RecordSubmissions';
 type Listing = Awaited<ReturnType<typeof listAuthorizedTenancies>>;
 type Detail = { records: Awaited<ReturnType<typeof retrieveTenancyRecords>>; answer: ReturnType<typeof recordEvidenceAnswer> };
 const money = (sen: number) => new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR' }).format(sen / 100);
@@ -71,7 +72,7 @@ export default function RecordsWorkspace() {
     finally { setBusy(false); }
   }
   return <main className={styles.shell}>
-    <header className={styles.header}><a href="/records" className={styles.brand}><i>re.</i> RentalEase <span>PRIVATE RECORDS</span></a><span className={styles.badge}>SUPABASE · READ ONLY</span></header>
+    <header className={styles.header}><a href="/records" className={styles.brand}><i>re.</i> RentalEase <span>PRIVATE RECORDS</span></a><span className={styles.badge}>SUPABASE · CONFIRMED SUBMISSIONS</span></header>
     <div className={styles.body}>
       <p className={styles.eyebrow}>A CLEARER END TO YOUR TENANCY</p>
       <div className={styles.intro}><div><h1>Your records.<br /><em>One shared understanding.</em></h1><p>Source text, recorded amounts, and access tied to your account.</p></div>{listing && <button disabled={busy} onClick={logout} className={styles.secondary}>Sign out</button>}</div>
@@ -92,10 +93,15 @@ export default function RecordsWorkspace() {
           <div className={styles.columns}><section><h2>Follow the source.</h2>{detail.records.evidence.map(e => <article className={styles.source} key={e.id} id={e.id}><div><strong>{e.kind.replaceAll('_', ' ')}</strong><span>{e.status}</span></div><p>{e.text ?? 'No written notes recorded.'}</p><small>{e.id}</small></article>)}{!detail.records.evidence.length && <p>No published reports available.</p>}
             {detail.records.agreement && <article className={styles.source}><div><strong>AGREEMENT</strong><span>{detail.records.agreement.status}</span></div><p>{detail.records.agreement.text}</p><small>{detail.records.agreement.id}</small></article>}</section>
           <aside className={styles.answer}><p className={styles.eyebrow}>RECORDS ASSISTANT · EXACT TEXT</p><h2>Read, then review.</h2><div className={styles.questions}><button aria-pressed={topic === 'evidence'} onClick={() => setTopic('evidence')}>Compare records</button><button aria-pressed={topic === 'refund'} onClick={() => setTopic('refund')}>Check recorded refund</button></div>
-            <p className={styles.answerText}>{topic === 'evidence' ? detail.answer.text : detail.records.settlement ? `The database records a refund amount of ${money(detail.records.settlement.recordedRefundSen)} with status ${detail.records.settlement.status}. ${detail.records.settlement.paymentRecorded ? 'A payment date and PAID status are recorded; this is not independent verification of a bank transfer.' : 'No completed payment is established by this record.'} This read-only workspace cannot transfer money or change the settlement.` : 'No settlement record is available. No refund amount is inferred.'}</p>
+            <p className={styles.answerText}>{topic === 'evidence' ? detail.answer.text : detail.records.settlement ? `The database records a refund amount of ${money(detail.records.settlement.recordedRefundSen)} with status ${detail.records.settlement.status}. ${detail.records.settlement.paymentRecorded ? 'A payment date and PAID status are recorded; this is not independent verification of a bank transfer.' : 'No completed payment is established by this record.'} Chat cannot transfer money or submit a dispute. Use the separate review-and-confirm form below for submissions.` : 'No settlement record is available. No refund amount is inferred.'}</p>
             <form onSubmit={ask} className={styles.ask}><label htmlFor="record-question">Ask about this tenancy</label><input id="record-question" value={question} onChange={e => setQuestion(e.target.value)} maxLength={600} required placeholder="What refund and deductions are recorded?" disabled={busy} /><button disabled={busy || !question.trim()} type="submit">Find in current records →</button></form>
             {reply && <section aria-live="polite"><p className={styles.eyebrow}>DATABASE RECORDS · {reply.answer.selection === 'local-model' ? 'LOCAL AI SOURCE SELECTION' : 'RULE-BASED ANSWER'}</p>{reply.answer.notice && <p role="status">{reply.answer.notice}</p>}<p className={styles.answerText}>{reply.answer.text}</p><p className={styles.sources}>Sources: {reply.answer.sourceIds.join(', ') || 'No factual claim retrieved'}<br />Retrieved: {new Date(reply.retrievedAt).toLocaleTimeString('en-GB')}</p></section>}
             <small>Each question rechecks access and reads current records. Optional local AI selects source IDs only. No conversational memory or AI-generated conclusions.</small></aside></div>
+          <RecordSubmissions key={detail.records.tenancyId} records={detail.records} busy={busy} setBusy={setBusy} reload={async () => {
+            const response = await fetch(`/api/records/${encodeURIComponent(detail.records.tenancyId)}`, { cache: 'no-store' });
+            if (!response.ok) throw new Error('Refresh failed.');
+            setDetail(await response.json()); setReply(null);
+          }} />
         </section>}
       </>}
       <footer className={styles.footer}>RentalEase Companion · Private by access, clear by evidence.</footer>

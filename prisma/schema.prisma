@@ -9,6 +9,7 @@ datasource db {
 
 // ─── USER ────────────────────────────────────────────────────────────────────
 model User {
+  recordsActions RecordsActionEvent[]
   id          String   @id @default(cuid())
   name        String
   email       String   @unique
@@ -178,6 +179,8 @@ model PropertyPhoto {
 // PENDING: tenant accepted, but agreement not yet signed.
 // ACTIVE:  agreement signed — rent schedule generated, tenancy is live.
 model Tenancy {
+  recordsRevision RecordsRevision?
+  recordsActions RecordsActionEvent[]
   id            String        @id @default(cuid())
   startDate     DateTime
   endDate       DateTime
@@ -411,6 +414,25 @@ model PaymentProof {
 }
 
 // ─── CONDITION REPORT ────────────────────────────────────────────────────────
+model RecordsRevision {
+  tenancyId String @id
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revision Int @default(0)
+}
+
+model RecordsActionEvent {
+  id String @id
+  tenancyId String
+  tenancy Tenancy @relation(fields: [tenancyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  actorId String
+  actor User @relation(fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  kind String
+  payload Json
+  revision Int
+  createdAt DateTime @default(now()) @db.Timestamp(3)
+  @@index([tenancyId, createdAt])
+}
+
 model ConditionReport {
   id             String          @id @default(cuid())
   type           ReportType

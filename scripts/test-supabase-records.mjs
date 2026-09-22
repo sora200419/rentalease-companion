@@ -25,7 +25,7 @@ try {
   assert.equal(a.depositSen, 240000); assert.equal(a.settlement.recordedRefundSen, 210000);
   assert.equal(a.settlement.paymentRecorded, false);
   assert.deepEqual(a.evidence, landlord.evidence);
-  assert.equal(a.evidence.length, 2); assert.equal(a.evidence.some(r => r.status === 'DRAFT'), false);
+  assert.ok(a.evidence.length >= 2); assert.equal(a.evidence.some(r => r.status === 'DRAFT'), false);
   stage = 'cross-tenancy denial';
   for (const id of ['fixture-b-tenant', 'fixture-b-landlord', 'nonexistent', '']) {
     await assert.rejects(retrieveTenancyRecords(db, id, 'fixture-a-tenancy'), /Tenancy unavailable/);

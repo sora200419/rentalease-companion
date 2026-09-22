@@ -11,6 +11,7 @@
     "dev:companion": "node scripts/dev-companion.mjs",
     "dev:records": "node scripts/dev-records.mjs",
     "test:records:http": "node scripts/test-records-http.mjs",
+    "test:records:writes": "node scripts/test-records-writes.mjs",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",

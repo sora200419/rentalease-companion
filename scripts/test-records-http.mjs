@@ -55,7 +55,9 @@ try {
     assert.equal(detail.records.depositSen, key === 'a' ? 240000 : 180000);
     assert.equal(detail.records.settlement.recordedRefundSen, key === 'a' ? 210000 : 170000);
     assert.equal(detail.answer.provider, 'records');
-    assert.equal(detail.records.evidence.length, 2);
+    assert.ok(detail.records.evidence.length >= 2);
+    assert.ok(detail.records.evidence.some(e => e.id === `fixture-${key}-in`));
+    assert.ok(detail.records.evidence.some(e => e.id === `fixture-${key}-out`));
     assert.ok(!JSON.stringify(detail).includes('PRIVATE_DRAFT'));
     assert.ok(!JSON.stringify(detail).includes('password'));
     stage = `grounded questions (${account.id})`;

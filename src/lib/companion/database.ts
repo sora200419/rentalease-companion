@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
+export type RecordsHistory = { id: string; actorId: string; kind: 'REPORT' | 'DISPUTE' | 'RESPONSE'; payload: { text: string; reportType?: string; deductionId?: string; disputeId?: string }; revision: number; createdAt: string };
 
 export function decimalToSen(value: { toString(): string }): number {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value.toString());
@@ -26,8 +27,10 @@ export async function retrieveTenancyRecords(db: PrismaClient, authenticatedUser
       },
     });
     if (!tenancy) throw new Error('Tenancy unavailable.');
+    const versions = await tx.$queryRaw<{ revision: number }[]>`SELECT revision FROM public."RecordsRevision" WHERE "tenancyId"=${tenancy.id}`;
+    const history = await tx.$queryRaw<(Omit<RecordsHistory, 'createdAt'> & { createdAt: Date })[]>`SELECT id,"actorId",kind,payload,revision,"createdAt" FROM public."RecordsActionEvent" WHERE "tenancyId"=${tenancy.id} ORDER BY revision DESC LIMIT 50`;
     const refund = tenancy.depositRefund;
-    return { tenancyId: tenancy.id, role: user.role,
+    return { tenancyId: tenancy.id, role: user.role, revision: versions[0]?.revision ?? 0, history: history.map(e => ({ ...e, createdAt: e.createdAt.toISOString() })),
       depositSen: decimalToSen(tenancy.depositAmount),
       settlement: refund ? { id: refund.id, status: refund.status, recordedOriginalSen: decimalToSen(refund.originalAmount),
         recordedRefundSen: decimalToSen(refund.refundAmount), paymentRecorded: refund.status === 'PAID' && refund.paidAt !== null,
