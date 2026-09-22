@@ -14,6 +14,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "prisma generate",
+    "db:check:supabase": "node scripts/check-supabase.mjs",
+    "test:db-config": "node --test tests/supabase-config.test.mjs",
     "db:validate": "prisma validate",
     "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate"
