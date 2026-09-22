@@ -70,6 +70,12 @@ export const config = {
 };
 
 export default function proxy(req: NextRequest, event: NextFetchEvent) {
+  if (process.env.COMPANION_RECORDS_MODE === '1') {
+    if (req.headers.get('host') !== '127.0.0.1:3031' || req.headers.get('sec-fetch-site') === 'cross-site') return NextResponse.json({ error: 'Local access only.' }, { status: 403 });
+    if (req.method !== 'GET' && req.headers.get('origin') !== 'http://127.0.0.1:3031') return NextResponse.json({ error: 'Same-origin request required.' }, { status: 403 });
+    if (/^\/api\/auth\/(csrf|session|providers|signin|signout|callback\/credentials)$/.test(req.nextUrl.pathname) || /^\/api\/records(?:\/[a-zA-Z0-9-]+(?:\/question)?)?$/.test(req.nextUrl.pathname)) return NextResponse.next();
+    return NextResponse.json({ error: 'Only read-only records APIs are enabled in this mode.' }, { status: 503 });
+  }
   if (process.env.COMPANION_OFFLINE_DEMO === '1') {
     if (/^\/api\/companion\/(session|resume|role|reset|prepare|confirm|cancel|chat)$/.test(req.nextUrl.pathname)) return NextResponse.next();
     return NextResponse.json({ error: 'Backend services are disabled in the offline companion demo.' }, { status: 503 });

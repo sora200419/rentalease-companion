@@ -31,15 +31,26 @@ These are fixture-backed prototype features. The production integration items be
 - [x] Add English follow-up, indirect action, stale amount and history-injection evaluations.
 - [ ] Expand adversarial coverage beyond the small synthetic evaluation before claiming submission-ready quality.
 
-Real-user authentication and database tenancy checks remain separate integration work; the local service uses synthetic identities.
+The local demo service uses synthetic identities. The separate Supabase records milestone below now checks real credential sessions against synthetic development accounts; production authentication remains open.
+
+### Completed authenticated records milestone (2026-09-22)
+
+- [x] Provision an explicitly approved read-only backend role, separate from migration access.
+- [x] Add loopback-only `/records` login, tenancy listing, exact evidence and recorded amounts.
+- [x] Verify all four synthetic accounts, cross-tenancy refusal, forbidden writes and sign-out over HTTP.
+- [x] Add deterministic English Q&A with fresh authorized retrieval, citations, missing-data and amount-consistency notices.
+- [x] Browser-test login and cited refund answers; retain the English cream/green interface.
+- [ ] Expand live session-revocation scenarios and production authorization design.
+- [x] Add optional local-model source selection on database evidence; render exact quotes only, validate IDs and preserve published baseline context.
+- [ ] Broaden source-selection relevance evaluation and real-world datasets; do not conflate quotes with verified findings.
 
 - [x] Import the existing source without secrets.
 - [x] Separate schema migration from production build.
 - [x] Document setup, provenance, and planned work.
 - [x] Install locked dependencies, generate/validate the schema, and pass the type check.
-- [ ] Run the app against an isolated database and test service accounts.
-- [x] Initialize the isolated Supabase development database and verify server-side record retrieval against two synthetic tenancies (not yet connected to the UI).
-- [ ] Add a repeatable synthetic dataset with tenant and landlord demo roles.
+- [x] Run the records workspace against an isolated database and test service accounts.
+- [x] Initialize the isolated Supabase development database and verify server-side record retrieval against two synthetic tenancies, now connected to `/records`.
+- [x] Add a repeatable synthetic dataset with tenant and landlord demo roles.
 - [ ] Establish targeted tests for record access, settlement calculations, and state transitions.
   - [x] Add 12 offline regression tests for inherited settlement/review transitions and evidence comparison.
   - [ ] Add server authorization, monetary calculation, and database integration tests. Pure helper tests do not prove tenancy access control.

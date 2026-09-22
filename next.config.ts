@@ -10,6 +10,7 @@ const cloudinaryCloud = process.env.CLOUDINARY_CLOUD_NAME;
 const cloudinaryPathname = cloudinaryCloud ? `/${cloudinaryCloud}/**` : '/**';
 
 const nextConfig: NextConfig = {
+  distDir: process.env.COMPANION_RECORDS_MODE === '1' ? '.next-records' : '.next',
   serverExternalPackages: ['@prisma/client', 'prisma'],
   images: {
     remotePatterns: [

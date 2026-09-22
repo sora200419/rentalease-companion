@@ -9,7 +9,7 @@ export function decimalToSen(value: { toString(): string }): number {
 }
 
 // The caller must derive authenticatedUserId from a verified server session,
-// never from a request body or the offline demo role selector. No HTTP exposure yet.
+// never from a request body or the offline demo role selector.
 export async function retrieveTenancyRecords(db: PrismaClient, authenticatedUserId: string, tenancyId: string) {
   if (!authenticatedUserId || !tenancyId) throw new Error('Tenancy unavailable.');
   return db.$transaction(async tx => {
@@ -21,7 +21,7 @@ export async function retrieveTenancyRecords(db: PrismaClient, authenticatedUser
         conditionReports: { where: { status: { in: ['SUBMITTED', 'PENDING_REVIEW', 'CORRECTION_REQUESTED', 'COUNTER_EVIDENCE_ADDED', 'ACCEPTED', 'DISPUTED', 'LOCKED'] } },
           select: { id: true, type: true, status: true, notes: true, submittedAt: true }, orderBy: { createdAt: 'asc' } },
         agreement: { select: { id: true, rawContent: true, status: true } },
-        depositRefund: { select: { status: true, originalAmount: true, refundAmount: true, paidAt: true,
+        depositRefund: { select: { id: true, status: true, originalAmount: true, refundAmount: true, paidAt: true,
           deductions: { select: { id: true, reason: true, amount: true, status: true }, orderBy: { createdAt: 'asc' } } } },
       },
     });
@@ -29,12 +29,25 @@ export async function retrieveTenancyRecords(db: PrismaClient, authenticatedUser
     const refund = tenancy.depositRefund;
     return { tenancyId: tenancy.id, role: user.role,
       depositSen: decimalToSen(tenancy.depositAmount),
-      settlement: refund ? { status: refund.status, recordedOriginalSen: decimalToSen(refund.originalAmount),
+      settlement: refund ? { id: refund.id, status: refund.status, recordedOriginalSen: decimalToSen(refund.originalAmount),
         recordedRefundSen: decimalToSen(refund.refundAmount), paymentRecorded: refund.status === 'PAID' && refund.paidAt !== null,
         deductions: refund.deductions.map(d => ({ id: d.id, reason: d.reason, amountSen: decimalToSen(d.amount), status: d.status })) } : null,
       evidence: tenancy.conditionReports.map(r => ({ id: r.id, kind: r.type, status: r.status, text: r.notes, submittedAt: r.submittedAt?.toISOString() ?? null })),
       agreement: tenancy.agreement ? { id: tenancy.agreement.id, status: tenancy.agreement.status, text: tenancy.agreement.rawContent } : null,
     };
+  }, { isolationLevel: 'RepeatableRead', timeout: 15000 });
+}
+
+export async function listAuthorizedTenancies(db: PrismaClient, authenticatedUserId: string) {
+  if (!authenticatedUserId) throw new Error('Tenancy unavailable.');
+  return db.$transaction(async tx => {
+    const user = await tx.user.findUnique({ where: { id: authenticatedUserId }, select: { id: true, role: true, isSuspended: true, deletedAt: true } });
+    if (!user || user.deletedAt || user.isSuspended || !['TENANT', 'LANDLORD'].includes(user.role)) throw new Error('Tenancy unavailable.');
+    const tenancies = await tx.tenancy.findMany({
+      where: user.role === 'TENANT' ? { tenantId: user.id } : { room: { property: { landlordId: user.id } } },
+      select: { id: true, status: true, room: { select: { label: true } } }, orderBy: { createdAt: 'desc' }, take: 50,
+    });
+    return { role: user.role, tenancies };
   }, { isolationLevel: 'RepeatableRead', timeout: 15000 });
 }
 

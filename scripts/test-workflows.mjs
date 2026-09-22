@@ -15,11 +15,13 @@ try {
     'src/lib/compareConditionReports.ts',
     'src/lib/companion/demo.ts',
     'src/lib/companion/service.ts',
+    'src/lib/companion/records-questions.ts',
+    'src/lib/companion/records-model.ts',
   ], { stdio: 'inherit' });
   if (compile.error) throw compile.error;
   if (compile.status !== 0) process.exitCode = compile.status ?? 1;
   else {
-    const tests = spawnSync(process.execPath, ['--test', 'tests/workflows.test.mjs', 'tests/companion.test.mjs', 'tests/companion-server.test.mjs'], {
+    const tests = spawnSync(process.execPath, ['--test', 'tests/workflows.test.mjs', 'tests/companion.test.mjs', 'tests/companion-server.test.mjs', 'tests/records-questions.test.mjs'], {
       stdio: 'inherit',
       env: { ...process.env, RENTALEASE_TEST_OUTPUT: output },
     });

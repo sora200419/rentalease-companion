@@ -2,7 +2,13 @@
 
 An evidence-based assistant for tenants and landlords completing a move-out and deposit settlement.
 
-**Status: experimental English local-AI prototype.** The `/companion` experience includes synthetic records, cited responses, demo roles, server-checked confirmations and file-backed sessions. Real inference with local Qwen3 4B has been exercised; financial/action/liability questions use authoritative rules. English follow-up tests are included; Chinese is deferred by owner request. Passing structural checks does not establish full factual accuracy. See [setup and evaluation findings](docs/LOCAL-MODEL.md). Production authentication/database integration, private evidence storage and blockchain upgrades remain planned. This is a development milestone, not the finished AI hackathon submission.
+**Status: experimental English prototype with two separate workspaces.** `/companion` includes local-AI inference over synthetic demo records, demo roles and confirmed local actions. `/records` now provides credential-based login, server-authorized Supabase records and source-cited deterministic English Q&A using synthetic development accounts. It is read-only, with optional local AI source-ID selection and exact database quotes (no generated factual prose). Production hardening, private evidence storage and blockchain upgrades remain planned. Passing tests does not establish complete factual accuracy or submission readiness. See [model evaluation](docs/LOCAL-MODEL.md) and [database setup/security limitations](docs/SUPABASE-DEVELOPMENT.md).
+
+## Try authenticated Supabase records
+
+On the configured development machine, run `npm run dev:records` and open `http://127.0.0.1:3031/records`. Test account credentials are stored only in the ignored `.local-runtime/records-test-accounts.json`; backend secrets are in `.env.records.local`. Sign in, open the authorized tenancy, and ask "What refund and deductions are recorded?" Each question rechecks access and reads current records. No paid model calls, payments, registrations or business writes occur. The setup is local-only; do not deploy these development credentials publicly. Run `npm run test:records:http` against the running server for integration checks.
+
+For optional local AI source selection, start the installed model with `npm run model:serve`, then start the records server with `npm run dev:records -- --local-model`. Ask "Was the scuff already there when I first arrived?" The model selects authorized source IDs; the server displays exact source text and keeps both move-in and move-out context. Invalid or unavailable AI falls back visibly. Amounts and actions remain rule-based. Verify with `node scripts/test-records-http.mjs --local-model`.
 
 ## Try the zero-spend prototype
 
@@ -41,7 +47,7 @@ These are inherited features, not hackathon additions. Importing their source do
 
 Use Node.js 22 LTS and npm. Provision a separate PostgreSQL database and development service credentials.
 
-1. Copy `.env.example` to `.env` and fill the variables for the features you will test. Never reuse the original application's database. The inherited login flow uses Upstash; a fully offline seeded demo is still a roadmap item.
+1. Copy `.env.example` to `.env` and fill the variables for the features you will test. Never reuse the original application's database. The inherited login flow uses Upstash; the separate companion and records modes above do not use that flow.
 2. Install the locked dependencies:
 
    ```sh
@@ -61,7 +67,7 @@ Use Node.js 22 LTS and npm. Provision a separate PostgreSQL database and develop
    npm run dev
    ```
 
-The development URL is `http://localhost:3000`. There are no pre-created demo accounts in this repository yet. Do not use real identity documents or tenant records when building the demo.
+The inherited development URL is `http://localhost:3000`. No account passwords are committed in this repository. The separate Supabase development setup contains synthetic test accounts. Do not use real identity documents or tenant records when building the demo.
 
 ## Checks and builds
 

@@ -16,6 +16,7 @@ export default async function RootLayout({
 }) {
   const skipBootstrap =
     process.env.COMPANION_OFFLINE_DEMO === '1' ||
+    process.env.COMPANION_RECORDS_MODE === '1' ||
     process.env.PRISMA_GENERATE_NO_ENGINE === '1' ||
     process.env.NEXT_PHASE === 'phase-production-build';
 
@@ -30,7 +31,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body>
-        {process.env.COMPANION_OFFLINE_DEMO === '1' ? children : <AuthSessionProvider>{children}</AuthSessionProvider>}
+        {process.env.COMPANION_OFFLINE_DEMO === '1' || process.env.COMPANION_RECORDS_MODE === '1' ? children : <AuthSessionProvider>{children}</AuthSessionProvider>}
       </body>
     </html>
   );
