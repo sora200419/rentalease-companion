@@ -27,7 +27,9 @@ These are fixture-backed prototype features. The production integration items be
 - [x] Add an optional local Ollama adapter with validated citations and visible rule fallback.
 - [x] Pass 34 tests plus actual HTTP and browser workflow checks.
 - [x] Install/select a local model after a hardware review, then evaluate real inference.
-- [ ] Resolve the Chinese evidence-quality evaluation failure and expand multi-turn/adversarial evaluation; do not claim submission-ready quality yet.
+- [x] Narrow the release scope to English per owner request; Chinese accuracy is deferred, not fixed.
+- [x] Add English follow-up, indirect action, stale amount and history-injection evaluations.
+- [ ] Expand adversarial coverage beyond the small synthetic evaluation before claiming submission-ready quality.
 
 Real-user authentication and database tenancy checks remain separate integration work; the local service uses synthetic identities.
 

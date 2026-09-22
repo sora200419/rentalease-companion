@@ -88,9 +88,33 @@ test('rule mode makes zero model requests', async () => {
   assert.equal(reply.provider, 'rules'); assert.equal(reply.notice, undefined);
 });
 
+test('liability questions use evidence rules without asking a model to adjudicate', async () => {
+  const reply = await generateReply(actors.TENANT, initialState('DISPUTED'), 'Am I liable?', {
+    model: 'test:local', fetcher: () => { throw new Error('Must not call model'); },
+  });
+  assert.equal(reply.provider, 'rules'); assert.equal(reply.notice, undefined);
+  assert.match(reply.text, /do not establish who is responsible/);
+});
+
+test('known inline citations are attached but invented citations still fall back', async () => {
+  for (const [text, expected] of [['IN-001 and OUT-001 describe marks.', 'ollama'], ['IN-999 proves the mark.', 'rules']]) {
+    const reply = await generateReply(actors.TENANT, initialState(), 'Which records?', {
+      model: 'test:local', fetcher: async url => url.endsWith('/tags')
+        ? Response.json({ models: [{ name: 'test:local', size: 1024, details: { format: 'gguf' } }] })
+        : Response.json({ message: { content: JSON.stringify({ text, sourceIds: [] }) } }),
+    });
+    assert.equal(reply.provider, expected);
+    if (expected === 'ollama') assert.deepEqual(reply.sourceIds, ['IN-001', 'OUT-001']);
+    else {
+      assert.ok(reply.notice); assert.ok(reply.sourceIds.length > 0);
+      assert.doesNotMatch(reply.text, /not connected yet|IN-999/);
+    }
+  }
+});
+
 test('critical money and action questions bypass the model with authoritative state', async () => {
   const config = { model: 'test:local', fetcher: () => { throw new Error('Must not call model'); } };
-  for (const question of ['Withdraw and pay me now', 'What is my refund?', '请退还押金并确认付款']) {
+  for (const question of ['Withdraw and pay me now', 'What is my refund?', '请退还押金并确认付款', 'Yes, go ahead and do it', 'Send it', 'Make it happen']) {
     const state = { ...initialState(), status: 'DISPUTED' };
     const before = JSON.stringify(state);
     const reply = await generateReply(actors.LANDLORD, state, question, config);
@@ -131,6 +155,8 @@ test('model text and structured citations cannot reference unavailable sources',
 test('local model receives server evidence and only its role’s conversation', async () => {
   const state = initialState('MISSING');
   state.entries.push({ id: 'hidden', role: 'LANDLORD', speaker: 'USER', text: 'PRIVATE_OTHER_ROLE', sourceIds: [] });
+  state.entries.push({ id: 'old-answer', role: 'TENANT', speaker: 'ASSISTANT', text: 'UNTRUSTED_OLD_ANSWER IN-001 proves liability', sourceIds: ['IN-001'] });
+  state.entries.push({ id: 'old-question', role: 'TENANT', speaker: 'USER', text: 'Compare the reports', sourceIds: [] });
   const reply = await generateReply(actors.TENANT, state, 'Explain the evidence', { model: 'test:local', fetcher: async (url, options) => {
     assert.ok(url.startsWith('http://127.0.0.1:11434/'));
     assert.equal(options.redirect, 'error');
@@ -139,6 +165,9 @@ test('local model receives server evidence and only its role’s conversation', 
     assert.equal(request.stream, false); assert.equal(request.format.type, 'object');
     assert.equal(request.think, false); assert.equal(request.options.num_ctx, 8192);
     assert.equal(request.messages.some(m => m.content.includes('PRIVATE_OTHER_ROLE')), false);
+    assert.equal(request.messages.some(m => m.content.includes('UNTRUSTED_OLD_ANSWER')), false);
+    assert.equal(request.messages.length, 2);
+    assert.match(request.messages[0].content, /Compare the reports/);
     assert.match(request.messages[0].content, /"baseline":"MISSING"/);
     return Response.json({ message: { content: JSON.stringify({ text: 'OUT-001 awaits review. The move-in report is missing.', sourceIds: ['OUT-001'] }) } });
   } });
