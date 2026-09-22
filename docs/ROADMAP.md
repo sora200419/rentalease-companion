@@ -38,6 +38,7 @@ Real-user authentication and database tenancy checks remain separate integration
 - [x] Document setup, provenance, and planned work.
 - [x] Install locked dependencies, generate/validate the schema, and pass the type check.
 - [ ] Run the app against an isolated database and test service accounts.
+- [x] Initialize the isolated Supabase development database and verify server-side record retrieval against two synthetic tenancies (not yet connected to the UI).
 - [ ] Add a repeatable synthetic dataset with tenant and landlord demo roles.
 - [ ] Establish targeted tests for record access, settlement calculations, and state transitions.
   - [x] Add 12 offline regression tests for inherited settlement/review transitions and evidence comparison.
