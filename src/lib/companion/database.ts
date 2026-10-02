@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-export type RecordsHistory = { id: string; actorId: string; kind: 'REPORT' | 'DISPUTE' | 'RESPONSE'; payload: { text: string; reportType?: string; deductionId?: string; disputeId?: string }; revision: number; createdAt: string };
+export type RecordsHistory = { id: string; actorId: string; kind: 'REPORT' | 'DISPUTE' | 'RESPONSE' | 'ACCEPTANCE' | 'REJECTION' | 'WITHDRAWAL' | 'ADJUSTMENT' | 'ADJUSTMENT_ACCEPTANCE' | 'ADJUSTMENT_REJECTION' | 'DEDUCTION_ACCEPTANCE' | 'EVIDENCE_LINK'; payload: { text: string; reportType?: string; deductionId?: string; disputeId?: string; responseId?: string; adjustmentId?: string; amountSen?: number; reportId?: string; fileKey?: string }; effects?: { deductionId?: string; beforeAmountSen?: number; afterAmountSen?: number; beforeRefundSen?: number; afterRefundSen?: number }; revision: number; createdAt: string };
 
 export function decimalToSen(value: { toString(): string }): number {
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value.toString());
@@ -23,12 +23,17 @@ export async function retrieveTenancyRecords(db: PrismaClient, authenticatedUser
           select: { id: true, type: true, status: true, notes: true, submittedAt: true }, orderBy: { createdAt: 'asc' } },
         agreement: { select: { id: true, rawContent: true, status: true } },
         depositRefund: { select: { id: true, status: true, originalAmount: true, refundAmount: true, paidAt: true,
-          deductions: { select: { id: true, reason: true, amount: true, status: true }, orderBy: { createdAt: 'asc' } } } },
+          deductions: { select: { id: true, reason: true, amount: true, status: true }, orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] } } },
       },
     });
     if (!tenancy) throw new Error('Tenancy unavailable.');
     const versions = await tx.$queryRaw<{ revision: number }[]>`SELECT revision FROM public."RecordsRevision" WHERE "tenancyId"=${tenancy.id}`;
-    const history = await tx.$queryRaw<(Omit<RecordsHistory, 'createdAt'> & { createdAt: Date })[]>`SELECT id,"actorId",kind,payload,revision,"createdAt" FROM public."RecordsActionEvent" WHERE "tenancyId"=${tenancy.id} ORDER BY revision DESC LIMIT 50`;
+    // Keep workflow decisions and file references; only plain reports are capped.
+    const history = await tx.$queryRaw<(Omit<RecordsHistory, 'createdAt'> & { createdAt: Date })[]>`
+      SELECT id,"actorId",kind,payload,effects,revision,"createdAt" FROM public."RecordsActionEvent"
+      WHERE "tenancyId"=${tenancy.id} AND (kind<>'REPORT' OR id IN (
+        SELECT id FROM public."RecordsActionEvent" WHERE "tenancyId"=${tenancy.id} ORDER BY revision DESC LIMIT 50
+      )) ORDER BY revision DESC`;
     const refund = tenancy.depositRefund;
     return { tenancyId: tenancy.id, role: user.role, revision: versions[0]?.revision ?? 0, history: history.map(e => ({ ...e, createdAt: e.createdAt.toISOString() })),
       depositSen: decimalToSen(tenancy.depositAmount),
@@ -50,7 +55,7 @@ export async function listAuthorizedTenancies(db: PrismaClient, authenticatedUse
       where: user.role === 'TENANT' ? { tenantId: user.id } : { room: { property: { landlordId: user.id } } },
       select: { id: true, status: true, room: { select: { label: true } } }, orderBy: { createdAt: 'desc' }, take: 50,
     });
-    return { role: user.role, tenancies };
+    return { role: user.role, viewerId: user.id, tenancies };
   }, { isolationLevel: 'RepeatableRead', timeout: 15000 });
 }
 

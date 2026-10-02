@@ -34,9 +34,24 @@ test('disputes require the owning tenant and an open proposed deduction', () => 
 });
 test('responses require a landlord and an existing dispute; production tenancies are blocked', () => {
   const action = { kind:'RESPONSE',payload:{ text:'Landlord response text.',disputeId:'event-a' } };
-  const landlord = { ...records,role:'LANDLORD',history:[{ id:'event-a',kind:'DISPUTE' }] };
+  const landlord = { ...records,role:'LANDLORD',settlement:{status:'DISPUTED',deductions:[{id:'deduction-a',status:'DISPUTED'}]},history:[{ id:'event-a',kind:'DISPUTE',payload:{deductionId:'deduction-a'} }] };
   validateAction(landlord,action);
   assert.throws(() => validateAction(records,action));
   assert.throws(() => validateAction({ ...landlord,history:[] },action));
   assert.throws(() => validateAction({ ...records,tenancyId:'real-tenancy' },report));
+});
+
+test('tenant acceptance is explicit, tied to an existing landlord response, and one-time', () => {
+  const dispute = { id:'dispute-a',kind:'DISPUTE',payload:{text:'Tenant dispute detail.',deductionId:'deduction-a'} };
+  const response = { id:'response-a',kind:'RESPONSE',payload:{text:'Landlord review response.',disputeId:'dispute-a'} };
+  const action = { kind:'ACCEPTANCE',payload:{text:'I accept this landlord response.',responseId:'response-a'} };
+  assert.deepEqual(parseAction(action),action);
+  const tenant = { tenancyId:'fixture-a-tenancy',role:'TENANT',settlement:{status:'DISPUTED',deductions:[{id:'deduction-a',status:'DISPUTED'}]},history:[dispute,response] };
+  validateAction(tenant,action);
+  assert.throws(() => validateAction({...tenant,role:'LANDLORD'},action));
+  assert.throws(() => validateAction({...tenant,history:[dispute]},action));
+  assert.throws(() => validateAction({...tenant,history:[dispute,response,{id:'accepted',kind:'ACCEPTANCE',payload:{responseId:'response-a'}}]},action));
+  assert.throws(() => parseAction({...action,payload:{...action.payload,text:'Please accept it.'}}));
+  assert.throws(() => validateAction({...tenant,settlement:{status:'AGREED',deductions:[{id:'deduction-a',status:'ACCEPTED'}]}},action));
+  assert.throws(() => validateAction({...tenant,history:[dispute,{...response,revision:1},{...response,id:'new-response',revision:2}]},action));
 });

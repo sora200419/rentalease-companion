@@ -1,6 +1,6 @@
 # Offline companion walkthrough
 
-Updated: the local service replaces browser-only storage. See [LOCAL-SERVER.md](LOCAL-SERVER.md) for the current session architecture, optional Ollama adapter and verification.
+This page covers only the local companion. See [JUDGE-GUIDE.md](JUDGE-GUIDE.md) for both workspaces and [LOCAL-SERVER.md](LOCAL-SERVER.md) for local sessions. An in-app guide is available at `/guide` in either development mode.
 
 ## Start
 
@@ -26,11 +26,11 @@ Cancelling a draft, changing role, or refreshing does not submit an action. Only
 ## Scope and limitations
 
 - All people, records and clause text are synthetic. The room images are labelled SVG illustrations, not uploaded or AI-inspected photos.
-- Default responses use a deterministic intent matcher. Optional Ollama inference is implemented but has not been verified with a real model here. No image analysis is performed.
+- Default responses use a deterministic intent matcher. Optional Ollama inference has been tested with a real model; the limited evaluation and remaining unsupported-claim risk are documented in [LOCAL-MODEL.md](LOCAL-MODEL.md). No image analysis is performed.
 - Demo role switching is not authentication. Fixture access checks exercise role/record boundaries, but are not a substitute for authenticated, server-enforced authorization.
 - Data is saved under `.companion-data/` on the local server, with a session cookie in the browser. Old localStorage records remain untouched but are no longer read. Never use real tenant information here.
 - Tabs share a session; stale writes are rejected and fetch current state for review. Changes are not pushed live to other tabs. Calculations use integer sen for the fixed MYR fixture, not a complete settlement engine.
-- No database schema, original tenant record, email, payment, signature, wallet, or cloud resource is changed. No private storage or blockchain confirmation flow is included yet.
+- This offline mode changes no database schema, original tenant record, email, payment, signature, wallet or cloud resource. Private storage exists only in the separate records workspace; blockchain confirmation remains deferred.
 
 ## Verification on 2026-09-21
 
@@ -39,4 +39,4 @@ Cancelling a draft, changing role, or refreshing does not submit an action. Only
 - Browser walkthrough verified evidence responses, tenant dispute, refresh persistence, landlord withdrawal and updated refund totals.
 - Responsive checks at 1440px and 390px showed no horizontal overflow. Missing-evidence behavior was also exercised in the browser. No browser console errors were observed during these checks.
 
-Next milestone: connect authenticated server evidence retrieval and a real model provider while retaining explicit action confirmation. Cloud usage remains subject to the owner's zero-spend constraint.
+Authenticated Supabase retrieval, private evidence and multi-item decisions now exist separately in `/records`. See [RECORDS-UAT.md](RECORDS-UAT.md). Public deployment, formal Alexa+ runtime integration and broader accuracy evaluation remain pending.

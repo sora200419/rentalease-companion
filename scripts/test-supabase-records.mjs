@@ -38,7 +38,16 @@ try {
   assert.ok(!answer.text.includes('PRIVATE_DRAFT'));
   assert.ok(!JSON.stringify(a).includes('password'));
   const b = await retrieveTenancyRecords(db, 'fixture-b-tenant', 'fixture-b-tenancy');
-  assert.equal(b.depositSen, 180000); assert.equal(b.settlement.recordedRefundSen, 170000);
+  assert.equal(b.depositSen, 180000);
+  assert.equal(b.settlement.recordedOriginalSen, 180000);
+  assert.deepEqual(new Set(b.settlement.deductions.map(d => d.id)), new Set(['fixture-b-deduction', 'fixture-b-cleaning', 'fixture-b-key']));
+  // The three-item demonstration is deliberately stateful: accepted revisions
+  // and withdrawals persist. Validate live arithmetic instead of resetting or
+  // assuming its original MYR 100 + 50 + 25 proposal amounts after a walkthrough.
+  const activeTotal = b.settlement.deductions.filter(d => d.status !== 'WITHDRAWN').reduce((sum, d) => sum + d.amountSen, 0);
+  assert.ok(b.settlement.deductions.every(d => Number.isSafeInteger(d.amountSen) && d.amountSen >= 0));
+  assert.equal(b.settlement.recordedRefundSen, b.settlement.recordedOriginalSen - activeTotal);
+  assert.equal(b.settlement.paymentRecorded, false);
   stage = 'missing records';
   assert.match(recordEvidenceAnswer({ ...a, evidence: [], agreement: null }).text, /No published move-in report/);
   stage = 'database exposure';

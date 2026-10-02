@@ -41,7 +41,7 @@ export async function POST(request: Request, context: { params: Promise<{ tenanc
     const e = error as { message?: string; meta?: { message?: string } };
     const message = e.meta?.message ?? e.message ?? '';
     if (/TENANCY_UNAVAILABLE|Tenancy unavailable/.test(message)) return fail('Tenancy unavailable.',404);
-    if (/STALE_REVISION|INVALID_TRANSITION|REPLAY_MISMATCH|ROLE_DENIED|INVALID_SUBMISSION/.test(message)) return fail('Records changed or action unavailable. Refresh and review again.',409);
+    if (/STALE_REVISION|INVALID_TRANSITION|REPLAY_MISMATCH|ROLE_DENIED|INVALID_SUBMISSION|AMOUNT_MISMATCH/.test(message)) return fail('Records changed, amounts need review, or action unavailable. Refresh and review again.',409);
     return fail('Could not verify submission result. Retry the same confirmation; do not create a new submission yet.',503);
   }
 }

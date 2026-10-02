@@ -1,4 +1,5 @@
 import type { retrieveTenancyRecords } from './database';
+import { evidenceNotices } from './records-evidence-notices';
 
 type Records = Awaited<ReturnType<typeof retrieveTenancyRecords>>;
 const money = (sen: number) => `MYR ${(sen / 100).toFixed(2)}`;
@@ -49,7 +50,7 @@ export function answerRecordQuestion(records: Records, question: string) {
   }
   if (/\b(report|reports|evidence|compare|comparison|move in|move out|condition|damage|notes|photo|photos)\b/.test(q)) {
     const lines = records.evidence.map(e => `${e.id} [${e.kind}; ${e.status}] — recorded notes:\n${e.text ?? 'No written notes recorded.'}`);
-    for (const kind of ['MOVE_IN', 'MOVE_OUT']) if (!records.evidence.some(e => e.kind === kind)) lines.push(`No published ${kind === 'MOVE_IN' ? 'move-in' : 'move-out'} report is available.`);
+    lines.push(...evidenceNotices(records.evidence));
     lines.push('Reports are presented side by side; differences and causation have not been independently established.', disclaimer);
     return result('evidence', lines.join('\n\n'), records.evidence.map(e => e.id));
   }

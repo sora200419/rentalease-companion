@@ -1,21 +1,77 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import type { retrieveTenancyRecords } from './database';
-export type ActionInput = { kind: 'REPORT' | 'DISPUTE' | 'RESPONSE'; payload: { text: string; reportType?: 'MOVE_IN' | 'MOVE_OUT' | 'INSPECTION'; deductionId?: string; disputeId?: string } };
+import type { retrieveTenancyRecords, RecordsHistory } from './database';
+import { openDisputes, availableResponses, availableAdjustments, revisedRefund, eventDeduction } from './records-workflow';
+export type ActionKind = RecordsHistory['kind'];
+export type ActionInput = { kind: ActionKind; payload: RecordsHistory['payload'] };
 type Prepared = ActionInput & { actorId: string; tenancyId: string; revision: number; id: string; expiresAt: number };
+const fields: Record<ActionKind,string[]> = {
+  REPORT:['text','reportType'], DISPUTE:['text','deductionId'], RESPONSE:['text','disputeId'],
+  ACCEPTANCE:['text','responseId'], REJECTION:['text','responseId'], WITHDRAWAL:['text','deductionId'],
+  ADJUSTMENT:['text','deductionId','amountSen'], ADJUSTMENT_ACCEPTANCE:['text','adjustmentId'],
+  ADJUSTMENT_REJECTION:['text','adjustmentId'], DEDUCTION_ACCEPTANCE:['text','deductionId'],
+  EVIDENCE_LINK:['text','deductionId','reportId','fileKey'],
+};
 export function parseAction(value: unknown): ActionInput {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid submission.');
-  const v = value as Record<string, unknown>;
-  if (Object.keys(v).some(k => !['kind','payload'].includes(k)) || !['REPORT','DISPUTE','RESPONSE'].includes(String(v.kind)) || !v.payload || typeof v.payload !== 'object' || Array.isArray(v.payload)) throw new Error('Invalid submission.');
-  const p = v.payload as Record<string, unknown>;
-  const field = v.kind === 'REPORT' ? 'reportType' : v.kind === 'DISPUTE' ? 'deductionId' : 'disputeId';
-  if (Object.keys(p).some(k => !['text',field].includes(k)) || typeof p.text !== 'string' || p.text.trim().length < 10 || p.text.length > 2000 || typeof p[field] !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(p[field] as string)) throw new Error('Invalid submission.');
-  if (v.kind === 'REPORT' && !['MOVE_IN','MOVE_OUT','INSPECTION'].includes(String(p.reportType))) throw new Error('Invalid submission.');
-  return { kind: v.kind, payload: { ...p, text: p.text.trim() } } as ActionInput;
+  const v = value as Record<string,unknown>;
+  if (Object.keys(v).some(k => !['kind','payload'].includes(k)) || typeof v.kind !== 'string' || !Object.prototype.hasOwnProperty.call(fields,v.kind) || !v.payload || typeof v.payload !== 'object' || Array.isArray(v.payload)) throw new Error('Invalid submission.');
+  const kind = v.kind as ActionKind;
+  const p = v.payload as Record<string,unknown>;
+  if (Object.keys(p).some(k => !fields[kind].includes(k)) || fields[kind].some(k => !(k in p)) || typeof p.text !== 'string' || p.text.trim().length < 10 || p.text.length > 2000) throw new Error('Invalid submission.');
+  for (const field of fields[kind].filter(k => k.endsWith('Id'))) {
+    if (typeof p[field] !== 'string' || !/^[a-zA-Z0-9_-]{1,100}$/.test(p[field] as string)) throw new Error('Invalid reference.');
+  }
+  if (kind === 'ADJUSTMENT' && (!Number.isSafeInteger(p.amountSen) || (p.amountSen as number) < 1 || (p.amountSen as number) > 9999999999)) throw new Error('Invalid amount.');
+  if (kind === 'REPORT' && !['MOVE_IN','MOVE_OUT','INSPECTION'].includes(String(p.reportType))) throw new Error('Invalid report type.');
+  if (kind === 'EVIDENCE_LINK' && (typeof p.fileKey !== 'string' || !/^fixture-[ab]-(tenant|landlord)--[a-f0-9]{64}--[a-zA-Z0-9_-]{1,70}\.(png|jpg|pdf)$/.test(p.fileKey))) throw new Error('Invalid file reference.');
+  const fixed: Partial<Record<ActionKind,string>> = {
+    ACCEPTANCE:'I accept this landlord response.',
+    ADJUSTMENT_ACCEPTANCE:'I accept this proposed deduction amount.',
+    DEDUCTION_ACCEPTANCE:'I accept this recorded deduction.',
+  };
+  if (fixed[kind] && p.text.trim() !== fixed[kind]) throw new Error('Explicit acceptance required.');
+  return { kind, payload: { ...p, text: p.text.trim() } as ActionInput['payload'] };
 }
 export function validateAction(records: Awaited<ReturnType<typeof retrieveTenancyRecords>>, action: ActionInput) {
   if (!['fixture-a-tenancy','fixture-b-tenancy'].includes(records.tenancyId)) throw new Error('Writes are limited to development fixtures.');
-  if (action.kind === 'DISPUTE' && (records.role !== 'TENANT' || !records.settlement || !['PROPOSED','IN_REVIEW','DISPUTED'].includes(records.settlement.status) || !records.settlement.deductions.some(d => d.id === action.payload.deductionId && d.status === 'PROPOSED'))) throw new Error('Action unavailable for the current role or record status.');
-  if (action.kind === 'RESPONSE' && (records.role !== 'LANDLORD' || !records.history.some(e => e.id === action.payload.disputeId && e.kind === 'DISPUTE'))) throw new Error('Action unavailable for the current role or record status.');
+  validateWorkflowAction(records, action);
+}
+// Pure business rules shared by the isolated demo. Database writers must use
+// validateAction above, which retains the additional fixture allowlist.
+export function validateWorkflowAction(records: Awaited<ReturnType<typeof retrieveTenancyRecords>>, action: ActionInput) {
+  if (!['TENANT','LANDLORD'].includes(records.role)) throw new Error('Role unavailable.');
+  if (action.kind === 'REPORT') return;
+  const settlement = records.settlement;
+  const fail = () => { throw new Error('Action unavailable for the current role or record status.'); };
+  if (!settlement) return fail();
+  const deduction = settlement.deductions.find(d => d.id === action.payload.deductionId);
+  if (action.kind === 'EVIDENCE_LINK') {
+    if (!deduction || !records.evidence.some(e => e.id === action.payload.reportId)) return fail();
+    if (records.history.some(e => e.kind === 'EVIDENCE_LINK' && e.payload.deductionId === deduction.id && e.payload.reportId === action.payload.reportId && e.payload.fileKey === action.payload.fileKey)) return fail();
+    return;
+  }
+  if (!['PROPOSED','IN_REVIEW','DISPUTED'].includes(settlement.status)) return fail();
+  if (['DISPUTE','DEDUCTION_ACCEPTANCE'].includes(action.kind) && (records.role !== 'TENANT' || deduction?.status !== 'PROPOSED')) return fail();
+  if (action.kind === 'WITHDRAWAL') {
+    if (records.role !== 'LANDLORD' || !deduction || !['PROPOSED','DISPUTED'].includes(deduction.status)) return fail();
+    revisedRefund(records,deduction.id,0);
+  }
+  if (action.kind === 'ADJUSTMENT') {
+    if (records.role !== 'LANDLORD' || !deduction || deduction.status !== 'DISPUTED' || !openDisputes(records).some(e => e.payload.deductionId === deduction.id)) return fail();
+    if (action.payload.amountSen === deduction.amountSen) return fail();
+    revisedRefund(records,deduction.id,action.payload.amountSen ?? -1);
+  }
+  if (action.kind === 'RESPONSE' && (records.role !== 'LANDLORD' || !openDisputes(records).some(e => e.id === action.payload.disputeId))) return fail();
+  if (['ACCEPTANCE','REJECTION'].includes(action.kind)) {
+    const response = availableResponses(records).find(e => e.id === action.payload.responseId);
+    if (records.role !== 'TENANT' || !response) return fail();
+    if (action.kind === 'ACCEPTANCE' && availableAdjustments(records).some(e => e.payload.deductionId === eventDeduction(records,response))) return fail();
+  }
+  if (['ADJUSTMENT_ACCEPTANCE','ADJUSTMENT_REJECTION'].includes(action.kind)) {
+    const proposal = availableAdjustments(records).find(e => e.id === action.payload.adjustmentId);
+    if (records.role !== 'TENANT' || !proposal) return fail();
+    if (action.kind === 'ADJUSTMENT_ACCEPTANCE') revisedRefund(records,proposal.payload.deductionId!,proposal.payload.amountSen!);
+  }
 }
 function sign(value: string, secret: string) {
   if (secret.length < 32) throw new Error('Signing configuration unavailable.');

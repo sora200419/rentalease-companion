@@ -1,5 +1,6 @@
 import type { retrieveTenancyRecords } from './database';
 import { answerRecordQuestion } from './records-questions';
+import { evidenceNotices } from './records-evidence-notices';
 type Records = Awaited<ReturnType<typeof retrieveTenancyRecords>>;
 type Config = { model?: string; fetcher?: typeof fetch };
 export type RecordsReply = ReturnType<typeof answerRecordQuestion> & { selection: 'rules' | 'local-model'; notice?: string };
@@ -41,7 +42,7 @@ export async function generateRecordAnswer(records: Records, question: string, c
     if (records.evidence.some(e => ids.has(e.id))) for (const e of records.evidence) ids.add(e.id);
     const picked = sources.filter(s => ids.has(s.id));
     const lines = picked.map(s => `${s.id} [${s.kind}; ${s.status}] — recorded text:\n${s.text}`);
-    if (picked.some(s => s.kind !== 'AGREEMENT')) for (const kind of ['MOVE_IN', 'MOVE_OUT']) if (!records.evidence.some(e => e.kind === kind)) lines.push(`No published ${kind === 'MOVE_IN' ? 'move-in' : 'move-out'} report is available.`);
+    if (picked.some(s => s.kind !== 'AGREEMENT')) lines.push(...evidenceNotices(records.evidence));
     lines.push('Local AI selected candidate sources, not an answer or a verified finding. Text is quoted from current records. No photo analysis, liability decision, payment verification or action was performed.');
     return { provider: 'records', topic: 'selected-sources', selection: 'local-model', text: lines.join('\n\n'), sourceIds: picked.map(s => s.id) };
   } catch {

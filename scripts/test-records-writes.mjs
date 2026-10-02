@@ -9,7 +9,8 @@ let stage='login'; let db;
 function client() {
   const jar=new Map();
   return async (path,body,origin=base) => {
-    const response=await fetch(base+path,{ method:body?'POST':'GET',redirect:'manual',headers:{ Cookie:[...jar].map(([k,v])=>`${k}=${v}`).join('; '),...(body?{Origin:origin,'Content-Type':'application/json'}:{}) },body:body?JSON.stringify(body):undefined });
+    const form=body instanceof URLSearchParams;
+    const response=await fetch(base+path,{ method:body?'POST':'GET',redirect:'manual',headers:{ Cookie:[...jar].map(([k,v])=>`${k}=${v}`).join('; '),...(body?{Origin:origin,'Content-Type':form?'application/x-www-form-urlencoded':'application/json'}:{}) },body:form?body:body?JSON.stringify(body):undefined });
     for(const c of response.headers.getSetCookie()) {const p=c.split(';')[0]; const i=p.indexOf('=');jar.set(p.slice(0,i),p.slice(i+1));}
     return response;
   };
@@ -17,8 +18,7 @@ function client() {
 async function login(id) {
   const account=accounts.find(a=>a.id===id); const request=client();
   const csrf=await (await request('/api/auth/csrf')).json();
-  // NextAuth also accepts JSON and the same CSRF cookie/token pair.
-  await request('/api/auth/callback/credentials',{csrfToken:csrf.csrfToken,email:account.email,password:account.password,json:true});
+  await request('/api/auth/callback/credentials',new URLSearchParams({csrfToken:csrf.csrfToken,email:account.email,password:account.password,json:'true',callbackUrl:`${base}/records`}));
   assert.equal((await request('/api/records')).status,200); return request;
 }
 try {
@@ -54,6 +54,16 @@ try {
   assert.deepEqual(after.settlement,before.settlement);
   const reread=(await (await landlord('/api/records/fixture-a-tenancy')).json()).records;
   assert.ok(reread.history.some(e=>e.id===prepared.preview.id));
+  if (after.settlement.deductions.find(d=>d.id==='fixture-a-deduction').status==='ACCEPTED') {
+    stage='retained closure and rejected attempts to reopen';
+    assert.equal(after.settlement.status,'AGREED');
+    const acceptance=after.history.find(e=>e.kind==='ACCEPTANCE');
+    assert.ok(acceptance);
+    const reply=after.history.find(e=>e.id===acceptance.payload.responseId);
+    assert.ok(reply);
+    assert.equal((await tenant(path,{operation:'prepare',action:{kind:'ACCEPTANCE',payload:{text:'I accept this landlord response.',responseId:reply.id}}})).status,400);
+    assert.equal((await landlord(path,{operation:'prepare',action:{kind:'RESPONSE',payload:{text:'Synthetic closed dispute must not accept replies.',disputeId:reply.payload.disputeId}}})).status,400);
+  } else {
   stage='tenant dispute and landlord response';
   const dispute={kind:'DISPUTE',payload:{deductionId:'fixture-a-deduction',text:'Synthetic tenant dispute: the mark was recorded before move-out. Please review the reports.'}};
   assert.equal((await landlord(path,{operation:'prepare',action:dispute})).status,400);
@@ -69,7 +79,21 @@ try {
   const reply={kind:'RESPONSE',payload:{disputeId,text:'Synthetic landlord response: I will review the published reports. The dispute is not resolved by this reply.'}};
   assert.equal((await tenant(path,{operation:'prepare',action:reply})).status,400);
   const p=await prepare(landlord,reply);assert.equal((await confirm(landlord,p)).status,200);
-  const final=await detail();assert.ok(final.history.some(e=>e.id===p.preview.id));assert.equal(final.settlement.status,'DISPUTED');
+  const afterReply=await detail();assert.ok(afterReply.history.some(e=>e.id===p.preview.id));assert.equal(afterReply.settlement.status,'DISPUTED');
+  const amountBeforeAcceptance=afterReply.settlement.recordedRefundSen;
+  stage='tenant accepts the landlord response and closes the dispute';
+  const acceptance={kind:'ACCEPTANCE',payload:{text:'I accept this landlord response.',responseId:p.preview.id}};
+  assert.equal((await landlord(path,{operation:'prepare',action:acceptance})).status,400);
+  const acceptedPreview=await prepare(tenant,acceptance);
+  assert.equal((await detail()).revision,afterReply.revision);
+  assert.equal((await confirm(tenant,acceptedPreview)).status,200);
+  assert.equal((await confirm(tenant,acceptedPreview)).status,200);
+  const final=await detail();
+  assert.ok(final.history.some(e=>e.id===acceptedPreview.preview.id&&e.kind==='ACCEPTANCE'));
+  assert.equal(final.settlement.status,'AGREED');
+  assert.equal(final.settlement.deductions.find(d=>d.id==='fixture-a-deduction').status,'ACCEPTED');
+  assert.equal(final.settlement.recordedRefundSen,amountBeforeAcceptance);
+  }
   stage='database privilege boundary';
   const settings=parseEnv(readFileSync('.env.records.local','utf8'));db=new PrismaClient({datasources:{db:{url:settings.RECORDS_DATABASE_URL}},log:[]});
   await assert.rejects(db.$executeRaw`UPDATE public."ConditionReport" SET notes=notes WHERE false`);
@@ -77,6 +101,6 @@ try {
   const [privileges]=await db.$queryRaw`SELECT has_function_privilege('anon','public.records_submit(text,text,text,integer,text,jsonb)','EXECUTE') AS anon,has_function_privilege('authenticated','public.records_submit(text,text,text,integer,text,jsonb)','EXECUTE') AS authenticated`;
   assert.equal(privileges.anon,false);assert.equal(privileges.authenticated,false);
   await assert.rejects(db.$queryRaw`SELECT public.records_submit('fixture-b-tenant','fixture-a-tenancy',${randomUUID()},0,'REPORT',${JSON.stringify(report.payload)}::jsonb)`);
-  console.log('PASS: preview/no-write, explicit confirmation, signature/actor/tenancy protection, concurrent idempotency, stale rejection, persisted reports/disputes/landlord replies, unchanged amounts, append-only history, denied direct table writes and public RPC access. Synthetic test submissions retained, not deleted.');
+  console.log('PASS: preview/no-write, explicit confirmation, signature/actor/tenancy protection, concurrent idempotency, stale rejection, persisted reports/disputes/landlord replies/tenant acceptance, dispute closure, unchanged amounts, append-only history, denied direct table writes and public RPC access. Synthetic test submissions retained, not deleted.');
 } catch { console.error(`FAIL at ${stage}. Credentials and raw database errors suppressed.`);process.exitCode=1; }
 finally { if(db)await db.$disconnect(); }
