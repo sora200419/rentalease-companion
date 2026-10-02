@@ -105,7 +105,8 @@ Acceptance: a changed file fails verification; a pending transaction is never la
 - [x] Add an independent three-item demo with bundled synthetic evidence, isolated file persistence and role-switched complete dispute resolution; no private database credentials.
 - [x] Add regressions for named/word-numbered targets, multi-intent clarification, exact proposal amounts and disputed counter-accounts.
 - [x] Complete the new independent demo's browser workflow and 320/390/760/1280px responsive QA (2026-09-29; keyboard/form interaction, not physical-device certification).
-- [x] Verify a clean local candidate without environment files: locked installation, 209 tests, production build and standalone HTTP workflow (2026-09-29). Remote GitHub clone parity remains a delivery check.
+- [x] Verify a clean local candidate without environment files: locked installation, 209 tests, production build and standalone HTTP workflow (2026-09-29).
+- [x] Synchronize the candidate to GitHub and verify a fresh clone: installation, 209 tests, TypeScript, lint, build and standalone HTTP workflow (2026-10-02). Source access/licensing and the final Devpost submission remain owner delivery steps.
 
 - [ ] Add optional voice input after the text flow works reliably.
 - [ ] Record an English demo shorter than three minutes.
