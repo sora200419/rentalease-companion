@@ -81,6 +81,7 @@ export default function JudgeDemo() {
   async function askAssistant(input: string): Promise<JudgeMessage | null> {
     if (!session || !input.trim()) return null;
     const spoken = normalizeSpokenQuestion(input);
+    if (!spoken) { setError('Ask a question after the invocation, for example “Alexa, ask RentalEase whether the scuff was already there.”'); return null; }
     const route = routeDialogue(session.records, session.selected, spoken);
     const updated = await command('assistant', { question: input });
     if (!updated) return null;
@@ -96,7 +97,7 @@ export default function JudgeDemo() {
   const assistant = session?.assistant ?? { mode: 'rules' as const };
   const latest = session?.messages.at(-1) ?? null;
   return <main className={styles.page}>
-    <header className={styles.header}><a className={styles.brand} href="/guide">re. RentalEase</a><span className={styles.eyebrow}>{assistant.mode === 'bedrock' ? 'Amazon Bedrock connected' : 'Rule mode · no cloud keys needed'}</span></header>
+    <header className={styles.header}><a className={styles.brand} href="/guide">re. RentalEase</a><span className={styles.eyebrow}>{assistant.mode === 'bedrock' ? 'Amazon Bedrock configured' : 'Rule mode · no cloud keys needed'}</span></header>
     <div className={styles.intro}><p className={styles.eyebrow}>Evidence first. Decisions by you.</p><h1>A clearer end<br />to your tenancy.</h1>
       <p>Ask about any deposit deduction by voice or text. RentalEase reads the move-in and move-out records through its MCP tools, quotes the sources, and drafts a reply — but only you can confirm a decision.</p>
       <p className={styles.small}>Alexa+ track · simulated experience. All people, records and labelled photos are synthetic; role switching simulates two people. No legal ruling or payment is made.</p></div>
@@ -115,7 +116,7 @@ export default function JudgeDemo() {
     </section>}
     {session && records && summary && <>
       <VoiceAssistant role={records.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT'} mode={assistant.mode} model={assistant.model}
-        disabled={busy || !!session.pending} pending={!!session.pending} ask={askAssistant} latest={latest} />
+        disabled={busy || !!session.pending} pending={!!session.pending} aiDraftPending={session.pending?.origin === 'assistant'} ask={askAssistant} latest={latest} />
       <div className={styles.metrics}><div>Recorded deposit<strong>{money(records.depositSen)}</strong></div><div>Current refund<strong>{money(records.settlement!.recordedRefundSen)}</strong></div><div>Resolved deductions<strong>{summary.resolvedCount} / 3</strong></div></div>
       <p>{summary.title} · {session.scenario.toLowerCase()} evidence · saved record revision {records.revision}. Proposed new amounts do not change the refund until accepted. No money is transferred.</p>
       <p className={styles.notice} role="status">{session.notice}</p>
@@ -142,7 +143,7 @@ export default function JudgeDemo() {
           <div className={styles.conversation} aria-label="Conversation history">{session.messages.map((message, i) => <article className={styles.message} key={i}><strong>You: {message.question}</strong><p className={styles.pre}>{message.text}</p>
             <p className={styles.provider}>{message.provider === 'bedrock' ? `Amazon Bedrock · ${message.model} · MCP tools: ${message.tools?.join(' → ') || 'none'}${message.drafted ? ' · drafted a decision' : ''}` : 'Rule mode · quoted from the records'}</p>
             <div className={styles.citations}>{message.sourceIds.map(id => <a key={id} href={citation(id)} target={id.startsWith('file:') ? '_blank' : undefined} rel={id.startsWith('file:') ? 'noreferrer' : undefined}>{id}</a>)}</div></article>)}</div>
-          <form onSubmit={e => { e.preventDefault(); void ask(); }}><label htmlFor="question">Ask about evidence or state a decision</label><textarea id="question" maxLength={600} value={question} onChange={e => setQuestion(e.target.value)} placeholder="Show evidence for the second deduction" disabled={busy} /><button disabled={busy || !question.trim()} type="submit">Send message</button></form>
+          <form onSubmit={e => { e.preventDefault(); void ask(); }}><label htmlFor="question">Ask about evidence or state a decision</label><textarea id="question" maxLength={600} value={question} onChange={e => setQuestion(e.target.value)} placeholder="Show evidence for the second deduction" disabled={busy || !!session.pending} /><button disabled={busy || !!session.pending || !question.trim()} type="submit">Send message</button></form>
           <form onSubmit={e => { e.preventDefault(); void prepare(); }}><label htmlFor="decision">Available action for this item</label><select id="decision" value={kind} disabled={busy || !!session.pending} onChange={e => choose(e.target.value as ActionKind | '')}>
             <option value="">Choose a decision</option>{options.map(o => <option key={o.kind} value={o.kind}>{labels[o.kind]}</option>)}
           </select>
@@ -151,12 +152,12 @@ export default function JudgeDemo() {
             <button type="submit" disabled={busy || !!session.pending || text.trim().length < 10}>Preview decision</button></>}
           </form>
           {session.pending && <section className={styles.preview} aria-label="Decision preview"><h3>Check before saving</h3>
-            {latest?.drafted && <p className={styles.aiDraft}>Drafted by Amazon Bedrock from the quoted records. Read it carefully: you decide whether to save it.</p>}<p>{session.pending.role} · {session.pending.description}</p><p className={styles.pre}>{session.pending.action.payload.text}</p><p>Valid for five minutes. Confirming records this exact decision locally. Cancelling or refreshing discards the preview.</p>
+            {session.pending.origin === 'assistant' && <p className={styles.aiDraft}>Drafted by Amazon Bedrock from the quoted records. Read it carefully: you decide whether to save it.</p>}<p>{session.pending.role} · {session.pending.description}</p><p className={styles.pre}>{session.pending.action.payload.text}</p><p>Valid for five minutes. Confirming records this exact decision locally. Cancelling or refreshing discards the preview.</p>
             <div className={styles.actions}><button className={styles.primary} disabled={busy} onClick={async () => { if (await command('confirm', { id: session.pending!.id })) clearDraft(); }}>Confirm and save</button><button disabled={busy} onClick={async () => { if (await command('cancel')) clearDraft(); }}>Cancel preview</button></div></section>}
         </section>
         <section className={styles.panel}><h2>Shared decision history.</h2><p>Both demo roles see confirmed decisions. Drafts, cancelled previews and chat messages are not settlement events.</p>
           {!records.history.some(e => e.kind !== 'EVIDENCE_LINK') && <p>No decisions saved yet.</p>}
-          <ol className={styles.history}>{records.history.filter(e => e.kind !== 'EVIDENCE_LINK').map(event => <li key={event.id}><strong>{labels[event.kind]}</strong><small>Revision {event.revision} · {event.actorId} · {event.createdAt}</small><p>{event.payload.text}</p>{event.payload.amountSen !== undefined && <p>Proposed: {money(event.payload.amountSen)}</p>}</li>)}</ol>
+          <ol className={styles.history}>{records.history.filter(e => e.kind !== 'EVIDENCE_LINK').map(event => <li key={event.id} id={'source-' + event.id}><strong>{labels[event.kind]}</strong><small>Revision {event.revision} · {event.actorId} · {event.createdAt}</small><p>{event.payload.text}</p>{event.payload.amountSen !== undefined && <p>Proposed: {money(event.payload.amountSen)}</p>}</li>)}</ol>
         </section>
       </div></div>
       <McpConnect role={records.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT'} />

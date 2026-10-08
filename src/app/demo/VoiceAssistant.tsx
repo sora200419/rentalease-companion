@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { JudgeMessage } from '@/lib/companion/judge-demo';
-import { speakable } from '@/lib/companion/voice';
+import { normalizeSpokenQuestion, speakable, speechParts, stripCitations } from '@/lib/companion/voice';
 import styles from './demo.module.css';
 
-// Browser speech APIs (Chrome/Edge expose recognition as webkitSpeechRecognition).
+// Browser speech APIs (Chrome/Edge expose recognition as SpeechRecognition or webkitSpeechRecognition).
 type Recognition = {
   lang: string; interimResults: boolean; continuous: boolean; maxAlternatives: number;
   start(): void; stop(): void; abort(): void;
@@ -29,6 +29,7 @@ const suggestions = {
 // Browser capabilities and the spoken-reply preference are read as external stores,
 // so the server render (no voice) and the first client render always match.
 const PREFERENCE = 'rentalease-voice-replies';
+let memoryPreference = true; // used when the browser blocks site storage
 const never = () => () => undefined;
 const hasRecognition = () => { const w = window as unknown as Record<string, unknown>; return typeof (w.SpeechRecognition ?? w.webkitSpeechRecognition) === 'function'; };
 const hasSynthesis = () => typeof speechSynthesis !== 'undefined';
@@ -36,15 +37,15 @@ function subscribePreference(onChange: () => void) {
   window.addEventListener('storage', onChange); window.addEventListener(PREFERENCE, onChange);
   return () => { window.removeEventListener('storage', onChange); window.removeEventListener(PREFERENCE, onChange); };
 }
-function readPreference() { try { return localStorage.getItem(PREFERENCE) !== 'off'; } catch { return true; } }
+function readPreference() { try { const stored = localStorage.getItem(PREFERENCE); return stored === null ? memoryPreference : stored !== 'off'; } catch { return memoryPreference; } }
 
 function englishVoice() {
   const voices = typeof speechSynthesis === 'undefined' ? [] : speechSynthesis.getVoices().filter(v => v.lang.toLowerCase().startsWith('en'));
   return voices.find(v => /Google US English|Samantha|Aria|Jenny|Natural/i.test(v.name)) ?? voices.find(v => v.lang === 'en-US') ?? voices[0];
 }
 
-export default function VoiceAssistant({ role, mode, model, disabled, pending, ask, latest }: {
-  role: 'TENANT' | 'LANDLORD'; mode: 'bedrock' | 'rules'; model?: string; disabled: boolean; pending: boolean;
+export default function VoiceAssistant({ role, mode, model, disabled, pending, aiDraftPending, ask, latest }: {
+  role: 'TENANT' | 'LANDLORD'; mode: 'bedrock' | 'rules'; model?: string; disabled: boolean; pending: boolean; aiDraftPending: boolean;
   ask: (question: string) => Promise<JudgeMessage | null>; latest: JudgeMessage | null;
 }) {
   const [state, setState] = useState<State>('idle');
@@ -53,69 +54,96 @@ export default function VoiceAssistant({ role, mode, model, disabled, pending, a
   const canSpeak = useSyncExternalStore(never, hasSynthesis, () => false);
   const voiceOn = useSyncExternalStore(subscribePreference, readPreference, () => true);
   const recognition = useRef<Recognition | null>(null), transcript = useRef('');
-  // Recognition finishes asynchronously; always use the latest ask (current revision) and preference.
-  const latestAsk = useRef(ask), latestVoiceOn = useRef(voiceOn);
-  useEffect(() => { latestAsk.current = ask; latestVoiceOn.current = voiceOn; });
-  useEffect(() => () => { recognition.current?.abort(); if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel(); }, []);
+  // Speech and recognition finish asynchronously; read the latest props through refs.
+  const latest$ = useRef({ ask, voiceOn, disabled });
+  useEffect(() => { latest$.current = { ask, voiceOn, disabled }; });
+  // Each reply gets a generation number so late callbacks from an older reply are ignored.
+  const generation = useRef(0), fallback = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const utterances = useRef<SpeechSynthesisUtterance[]>([]);
+  useEffect(() => () => {
+    recognition.current?.abort(); clearTimeout(fallback.current);
+    if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+  }, []);
+
+  function stopSpeaking() {
+    generation.current++; clearTimeout(fallback.current); utterances.current = [];
+    if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
+  }
+  function stopListening() {
+    const active = recognition.current;
+    recognition.current = null; transcript.current = '';
+    active?.abort();
+  }
 
   function speak(text: string) {
-    if (!latestVoiceOn.current || typeof speechSynthesis === 'undefined' || !text) { setState('idle'); return; }
-    speechSynthesis.cancel();
-    // Chrome stops long utterances early, so queue one utterance per sentence.
-    const parts = text.match(/[^.!?]+[.!?]*\s*/g)?.map(p => p.trim()).filter(Boolean) ?? [text];
-    const voice = englishVoice();
-    parts.forEach((part, i) => {
+    stopSpeaking();
+    if (!latest$.current.voiceOn || typeof speechSynthesis === 'undefined' || !text) { setState('idle'); return; }
+    const mine = generation.current, voice = englishVoice();
+    const done = () => { if (generation.current === mine) { clearTimeout(fallback.current); utterances.current = []; setState('idle'); } };
+    // One utterance per sentence: Chrome stops long utterances early.
+    utterances.current = speechParts(text).map((part, i, parts) => {
       const utterance = new SpeechSynthesisUtterance(part);
       utterance.lang = voice?.lang ?? 'en-US'; if (voice) utterance.voice = voice;
-      if (i === parts.length - 1) { utterance.onend = () => setState('idle'); utterance.onerror = () => setState('idle'); }
-      speechSynthesis.speak(utterance);
+      if (i === parts.length - 1) { utterance.onend = done; utterance.onerror = done; }
+      return utterance;
     });
+    utterances.current.forEach(utterance => speechSynthesis.speak(utterance));
+    // Some platforms never fire onend; never leave the ring "speaking" indefinitely.
+    fallback.current = setTimeout(done, 4000 + text.length * 90);
     setState('speaking');
   }
 
   async function submit(question: string) {
+    stopListening(); stopSpeaking();
     const text = question.trim();
-    if (!text || disabled) { setState('idle'); return; }
-    setHeard(text); setHint(''); setState('thinking');
-    const message = await latestAsk.current(text);
+    if (!text || latest$.current.disabled) { setState('idle'); return; }
+    setHeard(text);
+    if (!normalizeSpokenQuestion(text)) { setHint('What would you like to ask RentalEase? Tap the ring and ask your question.'); setState('idle'); return; }
+    setHint(''); setState('thinking');
+    const message = await latest$.current.ask(text);
     if (!message) { setState('idle'); return; }
     speak(message.speech ?? speakable(message.text));
   }
 
   function toggleListening() {
-    if (state === 'speaking') { speechSynthesis.cancel(); setState('idle'); return; }
+    if (state === 'speaking') { stopSpeaking(); setState('idle'); return; }
     if (state === 'listening') { recognition.current?.stop(); return; }
     if (state === 'thinking' || disabled) return;
     const w = window as unknown as Record<string, new () => Recognition>;
     const Speech = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Speech) { setHint('Voice input needs Chrome or Edge. Tap a suggestion or type below; answers are still read aloud.'); return; }
+    stopSpeaking(); stopListening();
     const listener = new Speech();
     Object.assign(listener, { lang: 'en-US', interimResults: true, continuous: false, maxAlternatives: 1 });
-    transcript.current = '';
+    // Browsers normally stop after a pause; never leave the ring listening indefinitely.
+    const safety = setTimeout(() => listener.stop(), 15000);
     listener.onresult = event => {
+      if (recognition.current !== listener) return;
       let text = '';
       for (let i = 0; i < event.results.length; i++) text += event.results[i][0].transcript;
       transcript.current = text; setHeard(text);
     };
-    listener.onerror = event => { if (event.error !== 'aborted') setHint(recognitionErrors[event.error] ?? 'Voice input stopped. Tap the ring to try again.'); };
-    // Browsers normally stop after a pause; never leave the ring listening indefinitely.
-    const safety = setTimeout(() => listener.stop(), 15000);
+    listener.onerror = event => {
+      if (recognition.current === listener && event.error !== 'aborted') setHint(recognitionErrors[event.error] ?? 'Voice input stopped. Tap the ring to try again.');
+    };
     listener.onend = () => {
       clearTimeout(safety);
-      recognition.current = null;
-      if (transcript.current.trim()) void submit(transcript.current);
+      if (recognition.current !== listener) return; // aborted or replaced
+      const spoken = transcript.current;
+      recognition.current = null; transcript.current = '';
+      if (spoken.trim()) void submit(spoken);
       else setState(current => current === 'listening' ? 'idle' : current);
     };
-    if (typeof speechSynthesis !== 'undefined') speechSynthesis.cancel();
     recognition.current = listener;
     setHeard(''); setHint(''); setState('listening');
-    try { listener.start(); } catch { setState('idle'); setHint('Voice input could not start. Tap the ring again.'); }
+    try { listener.start(); } catch { clearTimeout(safety); recognition.current = null; setState('idle'); setHint('Voice input could not start. Tap the ring again.'); }
   }
 
   function toggleVoice() {
     const next = !voiceOn;
-    if (!next && typeof speechSynthesis !== 'undefined') { speechSynthesis.cancel(); setState(s => s === 'speaking' ? 'idle' : s); }
-    try { localStorage.setItem(PREFERENCE, next ? 'on' : 'off'); } catch { /* storage unavailable: the toggle resets on reload */ }
+    memoryPreference = next;
+    if (!next) { stopSpeaking(); setState(s => s === 'speaking' ? 'idle' : s); }
+    try { localStorage.setItem(PREFERENCE, next ? 'on' : 'off'); } catch { /* storage blocked: the in-memory value applies until reload */ }
     window.dispatchEvent(new Event(PREFERENCE));
   }
 
@@ -123,7 +151,7 @@ export default function VoiceAssistant({ role, mode, model, disabled, pending, a
     : canListen ? 'Tap the ring and ask a question.' : 'Tap a suggestion or type below.',
     listening: 'Listening… tap again when you finish.', thinking: mode === 'bedrock' ? 'Thinking with Amazon Bedrock and the RentalEase MCP tools…' : 'Checking the records…',
     speaking: 'Speaking… tap the ring to stop.' }[state];
-  const answer = latest && (state !== 'thinking') ? latest : null;
+  const answer = latest && state !== 'thinking' ? latest : null;
   return <section className={styles.device} aria-labelledby="voice-heading">
     <button type="button" className={`${styles.ring} ${styles[state] ?? ''}`} onClick={toggleListening} disabled={disabled && state === 'idle'}
       aria-label={state === 'listening' ? 'Stop listening' : state === 'speaking' ? 'Stop speaking' : 'Ask by voice'} aria-pressed={state === 'listening'}>
@@ -132,22 +160,23 @@ export default function VoiceAssistant({ role, mode, model, disabled, pending, a
     <div className={styles.deviceBody}>
       <p className={styles.deviceEyebrow}>Alexa+ simulated experience · voice runs in your browser</p>
       <h2 id="voice-heading">Ask RentalEase.</h2>
-      <p className={styles.deviceStatus} role="status" aria-live="polite">{status}</p>
+      <p className={styles.deviceStatus} role="status">{status}</p>
       {heard && <p className={styles.heard}>“{heard}”</p>}
       {hint && <p className={styles.hint} role="alert">{hint}</p>}
-      {answer && <div className={styles.answer} aria-live="polite">
-        <p>{answer.provider === 'bedrock' ? answer.text.replace(/\s*\[[a-zA-Z0-9:_-]{1,80}\]/g, '') : answer.speech ?? answer.text.split('\n\n')[0]}</p>
+      {/* Always mounted so screen readers announce each new answer. */}
+      <div className={answer ? styles.answer : undefined} aria-live="polite">{answer && <>
+        <p>{answer.provider === 'bedrock' ? stripCitations(answer.text) : answer.speech ?? answer.text.split('\n\n')[0]}</p>
         {answer.sourceIds.length > 0 && <div className={styles.deviceSources}>Sources: {answer.sourceIds.map(id =>
           <a key={id} href={id.startsWith('file:') ? '/api/judge/photo?id=' + encodeURIComponent(id.slice(5)) : '#source-' + id}
             target={id.startsWith('file:') ? '_blank' : undefined} rel={id.startsWith('file:') ? 'noreferrer' : undefined}>{id}</a>)}</div>}
         <small>{answer.provider === 'bedrock' ? `Amazon Bedrock · ${answer.model} · MCP tools: ${answer.tools?.join(' → ') || 'none'}` : 'Rule mode · quoted from the records'}
-          {answer.drafted ? ' · AI draft ready below' : ''}</small>
-      </div>}
+          {aiDraftPending ? ' · AI draft ready below' : ''}</small>
+      </>}</div>
       <div className={styles.suggestions} aria-label="Suggested questions">
         {suggestions[role].map(s => <button type="button" key={s} disabled={disabled || state === 'thinking'} onClick={() => void submit(s)}>{s}</button>)}
       </div>
       <div className={styles.deviceFooter}>
-        <span>{mode === 'bedrock' ? `Amazon Bedrock · ${model}` : 'Rule mode · no cloud keys'}</span>
+        <span>{mode === 'bedrock' ? `Amazon Bedrock configured · ${model}` : 'Rule mode · no cloud keys'}</span>
         {canSpeak && <button type="button" className={styles.voiceToggle} onClick={toggleVoice} aria-pressed={voiceOn}>{voiceOn ? 'Spoken replies on' : 'Spoken replies off'}</button>}
       </div>
     </div>

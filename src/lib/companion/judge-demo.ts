@@ -20,7 +20,8 @@ export const photoIndex = [
 export type JudgeSession = {
   schema: 1; revision: number; expiresAt: number; scenario: Scenario; selected: string;
   records: Records;
-  pending: { id: string; revision: number; role: DemoRole; action: ActionInput; expiresAt: number; description: string } | null;
+  // origin marks previews drafted by the AI assistant, so the page can label them.
+  pending: { id: string; revision: number; role: DemoRole; action: ActionInput; expiresAt: number; description: string; origin?: 'assistant' } | null;
   receipts: string[];
   messages: JudgeMessage[];
   notice: string;
@@ -173,6 +174,7 @@ export function recordAssistantTurn(before: JudgeSession, revision: number, turn
       let next = session;
       if (target && target !== next.selected) next = applyJudgeCommand(next, 'select', { revision: next.revision, deductionId: target });
       next = applyJudgeCommand(next, 'prepare', { revision: next.revision, action: draft });
+      next.pending!.origin = 'assistant';
       next.messages[next.messages.length - 1].drafted = true;
       next.notice = 'AI drafted this decision. Check it below, then confirm or cancel. Nothing has been saved.';
       return next;

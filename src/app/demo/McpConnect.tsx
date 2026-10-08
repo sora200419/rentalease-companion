@@ -12,6 +12,7 @@ export default function McpConnect({ role }: { role: 'TENANT' | 'LANDLORD' }) {
   const [error, setError] = useState(''), [copied, setCopied] = useState('');
   async function load(open: boolean) {
     if (!open || connection) return;
+    setError('');
     try {
       const response = await fetch('/api/judge/mcp', { cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(15000) });
       const result = await response.json();
@@ -20,6 +21,7 @@ export default function McpConnect({ role }: { role: 'TENANT' | 'LANDLORD' }) {
     } catch (e) { setError(e instanceof Error ? e.message : 'Connection details are unavailable.'); }
   }
   async function copy(label: string, value: string) {
+    setError('');
     try { await navigator.clipboard.writeText(value); setCopied(label); } catch { setCopied(''); setError('Copy is unavailable here; select the text instead.'); }
   }
   const token = connection?.tokens[role] ?? '';

@@ -4,24 +4,39 @@ import type { Records } from './records-workflow';
 
 // "Alexa, ask RentalEase whether the scuff was there" -> "whether the scuff was there".
 // The simulation accepts an optional invocation phrase; it is never required.
+// Returns '' when only the invocation was spoken ("Alexa, ask RentalEase").
 export function normalizeSpokenQuestion(value: string) {
   return value.trim()
-    .replace(/^(?:(?:hey|ok|okay)[ ,]+)?(?:alexa|rental ?ease)[ ,.!:]*/i, '')
-    .replace(/^(?:ask|tell|open)[ ,]+rental ?ease[ ,.!:]*(?:to |about )?/i, '')
+    .replace(/^(?:(?:hey|ok|okay)[ ,]+)?(?:alexa|rental ?ease)[ ,.!:?]*/i, '')
+    .replace(/^(?:ask|tell|open)[ ,]+rental ?ease[ ,.!:?]*(?:to |about )?/i, '')
+    .trim()
     .replace(/^\w/, c => c.toUpperCase());
 }
 
-// Remove citation markers and layout so a speech synthesizer reads natural sentences.
+// Citation groups such as [move-in] or [move-in, file:W01] (shown as chips instead).
+export const CITATION_GROUP = /\s*\[([a-zA-Z0-9:_-]{1,80}(?:[\s,;]+[a-zA-Z0-9:_-]{1,80})*)\]/g;
+export function stripCitations(text: string) { return text.replace(CITATION_GROUP, ''); }
+
+export function spokenMoney(sen: number) {
+  const ringgit = Math.floor(sen / 100), rest = sen % 100;
+  return ringgit + ' ringgit' + (rest ? ' ' + rest + ' sen' : '');
+}
+
+// Remove citation markers and layout so a speech synthesizer reads natural sentences,
+// and say amounts as words ("MYR 1625.00" -> "1625 ringgit").
 export function speakable(text: string, limit = 520) {
-  const plain = text.replace(/\s*\[[a-zA-Z0-9:_-]{1,80}\]/g, '').replace(/[*_#`>]+/g, '').replace(/\s+/g, ' ').trim();
+  const plain = stripCitations(text)
+    .replace(/\b(?:MYR|RM)\s?(\d{1,8})(?:\.(\d{1,2}))?\b/g, (_, whole: string, cents = '') => spokenMoney(Number(whole) * 100 + Number(cents.padEnd(2, '0'))))
+    .replace(/[*_#`>]+/g, '').replace(/\s+/g, ' ').trim();
   if (plain.length <= limit) return plain;
   const cut = plain.slice(0, limit), end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '));
   return (end > 80 ? cut.slice(0, end + 1) : cut.replace(/\s+\S*$/, '') + '…') + ' The details are on screen.';
 }
 
-export function spokenMoney(sen: number) {
-  const ringgit = Math.floor(sen / 100), rest = sen % 100;
-  return ringgit + ' ringgit' + (rest ? ' ' + rest + ' sen' : '');
+// One utterance per sentence (Chrome cuts long utterances). Split only at sentence
+// punctuation followed by a space, never inside "1625.00" or "e.g.".
+export function speechParts(text: string) {
+  return text.split(/(?<=[.!?…])\s+(?=[A-Z0-9“"(])/).map(part => part.trim()).filter(Boolean);
 }
 
 // Report notes carry a visible "SYNTHETIC MOVE-IN:" style label for the screen; drop it when speaking.

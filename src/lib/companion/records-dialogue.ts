@@ -55,7 +55,8 @@ export function routeDialogue(records: Records, selected: string, message: strin
  const generic = new Set(['the','a','an','for','of','and','deduction','charge','cost','fee','replacement']);
  const named = deductions.flatMap((d, index) => {
    const tokens = d.reason.toLowerCase().match(/[a-z]+/g) ?? [];
-   return tokens.some(token => token.length > 2 && !generic.has(token) && new RegExp('\\b' + token + '\\b').test(text)) ? [index] : [];
+   // Accept simple plurals: "the keys" names the "Replacement key" deduction.
+   return tokens.some(token => token.length > 2 && !generic.has(token) && new RegExp('\\b' + token + 's?\\b').test(text)) ? [index] : [];
  });
  for (const name of named) indices.add(name);
  if (indices.size > 1) return stop('The message names different deductions. Please choose one deduction and one decision. Nothing has been prepared.');

@@ -1,13 +1,13 @@
-import type { ActionInput } from './records-actions';
+import type { ActionInput, ActionKind } from './records-actions';
 import { money, type Records } from './records-workflow';
-import { speakable } from './voice';
+import { CITATION_GROUP, speakable, stripCitations } from './voice';
 
 // The minimal subset of the Amazon Bedrock Converse API used here. Keeping it
 // structural lets tests drive the loop with a scripted model and no AWS account.
 export type ConverseContent = {
   text?: string;
   toolUse?: { toolUseId?: string; name?: string; input?: unknown };
-  toolResult?: { toolUseId: string; status: 'success' | 'error'; content: ({ json: unknown } | { text: string })[] };
+  toolResult?: { toolUseId: string; status?: 'success' | 'error'; content: ({ json: unknown } | { text: string })[] };
 };
 export type ConverseMessage = { role: 'user' | 'assistant'; content: ConverseContent[] };
 export type ConverseRequest = {
@@ -27,10 +27,36 @@ export type ToolClient = {
 export type AssistantResult = { text: string; speech: string; sourceIds: string[]; tools: string[]; focus: string | null; draft: ActionInput | null };
 
 const fixedTexts = 'Accepting the landlord reply: "I accept this landlord response." Accepting a revised amount: "I accept this proposed deduction amount." Accepting the deduction as recorded: "I accept this recorded deduction."';
-// A draft only becomes a preview when the person asked for a decision, so text
-// inside a record cannot turn a plain question into a pending action.
-const decisionRequest = /\b(dispute|contest|challenge|disagree|object|reject|decline|refuse|accept|agree|withdraw|remove|drop|propose|offer|reduce|lower|revise|adjust|reply|respond|draft|write)\b/i;
-const savedClaim = /\b(?:i|we)(?: have|'ve)? (?:saved|submitted|confirmed|sent|paid|transferred|recorded)\b/i;
+
+// A draft only becomes a preview when the person asked for that kind of decision, so
+// a plain question, a refusal or text inside a record cannot create a pending action.
+// "draft"/"write" only ask for decisions that carry the person's own words.
+const intentVerbs: Record<ActionKind, RegExp> = {
+  DISPUTE: /\b(dispute|contest|challenge|disagree|object|draft|write)\b/,
+  RESPONSE: /\b(reply|respond|answer|draft|write)\b/,
+  REJECTION: /\b(reject|decline|refuse|disagree|draft|write)\b/,
+  ADJUSTMENT_REJECTION: /\b(reject|decline|refuse|disagree)\b/,
+  ACCEPTANCE: /\b(accept|agree)\b/, ADJUSTMENT_ACCEPTANCE: /\b(accept|agree)\b/, DEDUCTION_ACCEPTANCE: /\b(accept|agree)\b/,
+  WITHDRAWAL: /\b(withdraw|remove|drop|cancel)\b/,
+  ADJUSTMENT: /\b(propose|offer|reduce|lower|revise|adjust|counter)\b/,
+  REPORT: /$^/, EVIDENCE_LINK: /$^/,
+};
+const informational = /^(?:what|which|who|whom|whose|when|where|why|how|whether|if|should|did|does|do|is|are|was|were|has|have|had|would|will)\b/;
+const politeRequest = /^(?:(?:can|could|would|will) you|please|help me|i (?:want|would like|need|wish) to|i'd like to|go ahead|let's)\b/;
+const negatedDecision = /\b(?:don't|dont|do not|not|never|no longer|won't|wont|cannot|can't|cant|without)\b[^.?!]{0,30}?\b(?:dispute|contest|challenge|reject|decline|refuse|accept|agree|withdraw|remove|drop|propose|offer|reply|respond|draft|write)/;
+export function draftMatchesRequest(question: string, draft: ActionInput, previous?: { question: string; text: string }) {
+  const q = question.toLowerCase().replace(/[’]/g, "'").trim();
+  // A short answer to the assistant's own clarifying question continues the earlier request.
+  const followUp = !!previous && /\?\s*$/.test(previous.text.trim()) && !informational.test(q);
+  const request = followUp ? previous!.question.toLowerCase() + ' ' + q : q;
+  if (negatedDecision.test(request)) return false;
+  if (informational.test(q) && !politeRequest.test(q)) return false;
+  return intentVerbs[draft.kind].test(request);
+}
+// Claims that something was saved or sent, unless the sentence is about what has not happened yet.
+const savedClaim = /\b(?:(?:i|we)(?: have|'ve)?|(?:has|have|had|was|were|is|are)(?: now)?(?: been)?|gone ahead and|now)\s+(?:saved|submitted|confirmed|sent|paid|transferred|recorded|filed)\b/i;
+const claimsSaved = (text: string) => text.split(/(?<=[.!?])\s+/)
+  .some(sentence => savedClaim.test(sentence) && !/\b(nothing|not|never|until|unless|once|only|before|after you|when you|if you)\b/i.test(sentence));
 
 // Amazon Nova accepts only a subset of JSON Schema for tools: the top level may hold
 // type/properties/required, and nested oneOf unions are poorly followed. Present a
@@ -96,9 +122,13 @@ export async function runAssistant(options: {
   const toolConfig = { tools: tools.map(tool =>
     ({ toolSpec: { name: tool.name, description: tool.description ?? tool.name, inputSchema: { json: modelToolSchema(tool.inputSchema) } } })) };
   // Nova 1 calls tools more reliably with greedy decoding; other models get no extra fields.
-  const nova1 = /(?:^|[.:/])amazon\.nova-(?:micro|lite|pro)-v1/.test(modelId);
+  const nova1 = /(?:^|[.:/])amazon\.nova-(?:micro|lite|pro|premier)-v1/.test(modelId);
+  // toolResult.status is only accepted by Amazon Nova and Anthropic Claude models.
+  const statusField = /(?:^|[.:/])(?:amazon\.nova|anthropic\.claude)/.test(modelId);
+  // Bedrock rejects blank text blocks, so skip any turn without both sides.
+  const history = (options.history ?? []).filter(turn => turn.question.trim() && turn.text.trim()).slice(-3);
   const messages: ConverseMessage[] = [];
-  for (const turn of (options.history ?? []).slice(-3)) {
+  for (const turn of history) {
     messages.push({ role: 'user', content: [{ text: turn.question.slice(0, 600) }] }, { role: 'assistant', content: [{ text: turn.text.slice(0, 800) }] });
   }
   messages.push({ role: 'user', content: [{ text: question }] });
@@ -132,21 +162,26 @@ export async function runAssistant(options: {
         focus = (data.deduction as { id?: string } | null)?.id ?? focus;
       }
       const error = Array.isArray(result.content) ? result.content.map(c => (c as { text?: string }).text ?? '').join(' ').slice(0, 400) : '';
-      results.push({ toolResult: { toolUseId: String(toolUse?.toolUseId ?? ''), status: failed ? 'error' : 'success',
-        content: failed ? [{ text: error || 'Tool error.' }] : [{ json: data ?? {} }] } });
+      results.push({ toolResult: { toolUseId: String(toolUse?.toolUseId ?? ''), ...(statusField ? { status: failed ? 'error' as const : 'success' as const } : {}),
+        content: failed ? [{ text: (statusField ? '' : 'Error: ') + (error || 'Tool error.') }] : [{ json: data ?? {} }] } });
     }
     messages.push({ role: 'user', content: results });
   }
   if (!text) throw new Error('The assistant did not finish an answer.');
-  // Keep only citations that point at real records; never show an invented source.
+  // Keep only citations that point at real records, including inside "[a, b]" groups;
+  // never show an invented source.
   const known = new Set([...toolSources, ...(records.settlement?.deductions ?? []).map(d => d.id),
     ...records.evidence.map(e => e.id), ...(records.agreement ? [records.agreement.id] : [])]);
-  text = text.replace(/\s*\[([a-zA-Z0-9:_-]{1,80})\]/g, (marker, id) => known.has(id) ? marker : '');
+  text = text.replace(CITATION_GROUP, (_group, ids: string) => {
+    const kept = ids.split(/[\s,;]+/).filter(id => known.has(id));
+    return kept.length ? ' ' + kept.map(id => '[' + id + ']').join(' ') : '';
+  }).trim();
+  if (!stripCitations(text).trim()) throw new Error('The model answer had no readable text.');
   const cited = [...text.matchAll(/\[([a-zA-Z0-9:_-]{1,80})\]/g)].map(match => match[1]);
-  if (draft && !decisionRequest.test(question)) {
+  if (draft && !draftMatchesRequest(question, draft, history.at(-1))) {
     draft = null;
-    text += ' I have not prepared a decision because you did not ask for one.';
+    text += ' I have not put a draft on screen because it does not match what you asked. Say the decision you want, for example “Dispute the wall charge”, or use the action menu.';
   }
-  if (savedClaim.test(text)) text += ' Nothing has been saved yet: you confirm every decision yourself.';
+  if (claimsSaved(text)) text += ' Nothing has been saved yet: you confirm every decision yourself.';
   return { text, speech: speakable(text), sourceIds: [...new Set(cited.length ? cited : toolSources)].slice(0, 10), tools: called, focus, draft };
 }
