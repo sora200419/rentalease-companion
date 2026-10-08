@@ -12,7 +12,7 @@ Follow the [complete independent walkthrough](INDEPENDENT-DEMO.md). Start with a
 
 The role switch is a simulation, not database authorization. The older single-item `/companion` demonstration is retained separately. The independent demo passed browser workflow, responsive and no-credentials clean-install acceptance on 2026-09-29; see [verification scope and remaining delivery checks](FINAL-ACCEPTANCE.md).
 
-On 2026-10-08 the voice, suggestion and MCP additions passed 234 automated tests, the live HTTP suite in rule mode and in Bedrock mode against the local mock, the official MCP Inspector CLI against the live demo endpoint, and a headless Chromium walkthrough with mocked speech APIs. A clean Linux `npm ci` also passed after a lockfile fix. Not verified: a live Amazon Bedrock call, real microphone or speaker hardware, Safari or Firefox, a clean macOS clone, and a real Claude Desktop install. Details are in the [independent demo verification](INDEPENDENT-DEMO.md#verification).
+On 2026-10-08 the voice, suggestion and MCP additions passed 244 automated tests, the live HTTP suite in rule mode and in Bedrock mode against the local mock, the official MCP Inspector CLI against the live demo endpoint, and a headless Chromium walkthrough with mocked speech APIs. A clean Linux `npm ci` also passed after a lockfile fix. Not verified: a live Amazon Bedrock call, real microphone or speaker hardware, Safari or Firefox, a clean macOS clone, and a real Claude Desktop install. Details are in the [independent demo verification](INDEPENDENT-DEMO.md#verification).
 
 ## What to try in five minutes
 
@@ -49,7 +49,7 @@ The records endpoint is local-only. A remote judge cannot reach a localhost URL 
 
 ## Reproducible checks
 
-- `npm test`: pure business, conversation, evidence and summary regressions, plus voice phrasing, assistant, demo MCP token and lockfile platform checks; no cloud credentials. The assistant tests use a scripted stand-in for Bedrock Converse. 234 of 234 passed on 2026-10-08.
+- `npm test`: pure business, conversation, evidence and summary regressions, plus voice phrasing, assistant, demo MCP token and lockfile platform checks; no cloud credentials. The assistant tests use a scripted stand-in for Bedrock Converse. 244 of 244 passed on 2026-10-08.
 - `npm run test:mcp`: standard-client protocol, tool schemas, preview and access-isolation checks with synthetic records, including the demo endpoint's bearer token, host and Origin checks.
 - `npm run test:demo:http`: against the running `npm run dev:companion` server; the full demo workflow plus the assistant and an MCP SDK client over real HTTP with the case bearer token. Passed on 2026-10-08 in rule mode and in Bedrock mode against the local mock.
 - `npm run typecheck`: TypeScript verification.

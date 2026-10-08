@@ -6,7 +6,7 @@ Updated 2026-10-08. Target: 2 minutes 45 seconds; keep the final cut under 3 min
 
 Work through this list in the browser profile you will record with.
 
-- [ ] **Amazon Bedrock.** Set `COMPANION_BEDROCK_MODEL` and AWS credentials (or a Bedrock API key) in `.env.local`, then restart `npm run dev:companion`. Model IDs, region and IAM are in [voice assistant and Amazon Bedrock](VOICE-ASSISTANT.md). The header's **Amazon Bedrock connected** only reflects the configuration. Ask one rehearsal question and check that the answer label starts *Amazon Bedrock ·* and the notice does not start "Amazon Bedrock was unavailable". Set an AWS budget alert as well.
+- [ ] **Amazon Bedrock.** Set `COMPANION_BEDROCK_MODEL` and AWS credentials (or a Bedrock API key) in `.env.local`, then restart `npm run dev:companion`. Model IDs, region and IAM are in [voice assistant and Amazon Bedrock](VOICE-ASSISTANT.md). The header's **Amazon Bedrock configured** only reflects the configuration. Ask one rehearsal question and check that the answer label starts *Amazon Bedrock ·* and the notice does not start "Amazon Bedrock was unavailable". Set an AWS budget alert as well.
 - [ ] **No mock on camera.** Never record against `scripts/mock-bedrock.mjs`: its replies are scripted test fixtures, not model output. If the live run does not work, record the rule-mode version below.
 - [ ] **Chrome.** Use Chrome (Edge also supports voice input). Chrome sends microphone audio to Google's speech service and needs internet; only synthetic data is on screen.
 - [ ] **Microphone.** Open exactly `http://127.0.0.1:3030/demo` and allow the microphone when asked. Mute or move away any real Alexa device, because the spoken question starts with "Alexa".

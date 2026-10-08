@@ -52,7 +52,7 @@ There is no confirm or payment tool. Recipes for MCP Inspector, Claude Code and 
 
 On 2026-10-08, in a Linux container:
 
-- `npm test`: 234/234 regressions pass.
+- `npm test`: 244/244 regressions pass.
 - TypeScript, lint and the production build pass.
 - `npm run test:demo:http` passes against the running demo in rule mode and in Bedrock-mock mode.
 - The official MCP Inspector CLI listed and called the tools against the live endpoint.

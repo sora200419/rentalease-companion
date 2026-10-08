@@ -25,9 +25,13 @@ Suggestion chips (tenant and landlord sets) work without a microphone. **Spoken 
 | Mode | When | What answers |
 | --- | --- | --- |
 | Rule mode (default) | `COMPANION_BEDROCK_MODEL` is blank | The deterministic RentalEase rules. They quote records exactly and need no cloud account. |
-| Amazon Bedrock | `COMPANION_BEDROCK_MODEL` is set | An Amazon Nova model (or another Converse model) that reads the case only through the RentalEase MCP tools. |
+| Amazon Bedrock | `COMPANION_BEDROCK_MODEL` is set to a valid id | An Amazon Nova model that reads the case only through the RentalEase MCP tools. Anthropic Claude models on Bedrock should also work; other tool-capable Converse models get the same tools but are untested. |
 
-The page header and every answer show which mode answered, for example *Amazon Bedrock · apac.amazon.nova-pro-v1:0 · MCP tools: get_deduction_evidence*. If Bedrock fails for any reason, the rule assistant answers and the notice starts with *"Amazon Bedrock was unavailable, so the rule assistant answered."* The server log shows the error name and message.
+Every answer shows which mode answered, for example *Amazon Bedrock · apac.amazon.nova-pro-v1:0 · MCP tools: get_deduction_evidence*. The header only shows whether Bedrock is configured. The rule assistant answers instead, with a notice, in three cases:
+
+- Bedrock fails for any reason: the notice starts *"Amazon Bedrock was unavailable, so the rule assistant answered."* The server log shows the error name and message.
+- The model id is invalid (for example it contains quotes or spaces): the notice starts *"COMPANION_BEDROCK_MODEL is not a valid model or inference profile id…"*.
+- The local cost guard is reached: the notice says the AI assistant is busy or at its hourly limit.
 
 ## Set up Amazon Bedrock
 
@@ -49,14 +53,14 @@ The page header and every answer show which mode answered, for example *Amazon B
    AWS_BEARER_TOKEN_BEDROCK=your-bedrock-api-key
    ```
 
-4. Restart `npm run dev:companion`. The header should read **Amazon Bedrock connected**.
+4. Restart `npm run dev:companion`. The header should read **Amazon Bedrock configured** (this reflects the settings, not a successful call).
 5. Ask "Was the scuff already there when I moved in?" and check the answer label lists `get_deduction_evidence`.
 
 Region falls back to `AWS_REGION`, then `AWS_DEFAULT_REGION`, then `us-east-1`. Credentials stay on the server; the browser only receives answers.
 
 ### Cost and limits
 
-Each question makes up to five model calls (one per tool round), with up to 800 output tokens each and a 30-second deadline. A process-local guard allows two AI answers at a time and 40 per case per hour; beyond that the rule assistant answers. This guard is not a billing control: set an AWS budget alert as well.
+Each question makes up to five model calls (one per tool round), with up to 800 output tokens each and a 30-second deadline. A process-local guard allows two AI answers at a time, 40 per case per hour and 120 per server process per hour (so starting new scenarios does not reset it); beyond that the rule assistant answers. This guard is not a billing control: set an AWS budget alert as well.
 
 ## How it works
 
@@ -105,7 +109,7 @@ npm run test:demo:http
 
 Verified in a Linux container (Node 22.22.0):
 
-- `npm test`: 234/234 pass, including scripted-model tests of the tool loop, drafts, fallback, role rules and schema flattening.
+- `npm test`: 244/244 pass, including scripted-model tests of the tool loop, drafts, fallback, role rules and schema flattening.
 - `npm run test:demo:http` passes in rule mode and in Bedrock mode against the mock.
 - Headless Chromium with mocked speech APIs, in both modes:
   - spoken question answered with citations;
@@ -127,7 +131,7 @@ Run the Bedrock setup above with your own account and record what you observe in
 
 | Symptom | Likely cause |
 | --- | --- |
-| Header says *Rule mode* | `COMPANION_BEDROCK_MODEL` is blank or invalid, or the server was not restarted. |
+| Header says *Rule mode* | `COMPANION_BEDROCK_MODEL` is blank or invalid (an invalid id also adds a notice to each answer), or the server was not restarted. |
 | Notice: *Amazon Bedrock was unavailable* | Check the server log. `UnrecognizedClientException` or `CredentialsProviderError` means bad or missing credentials. `AccessDeniedException` means IAM does not allow `bedrock:InvokeModel`. A `ValidationException` about on-demand throughput means you used a base model ID where an inference profile (`apac.` / `us.` / `global.`) is required. |
 | *Microphone access is blocked* | Allow the microphone in the address bar, or use the chips. |
 | *Chrome's speech recognition needs an internet connection* | Chrome's recognition is a network service; use the chips or typing offline. |

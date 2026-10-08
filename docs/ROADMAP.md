@@ -111,7 +111,7 @@ Acceptance: a changed file fails verification; a pending transaction is never la
 - [x] Verify a clean local candidate without environment files: locked installation, 209 tests, production build and standalone HTTP workflow (2026-09-29).
 - [x] Synchronize the candidate to GitHub and verify a fresh clone: installation, 209 tests, TypeScript, lint, build and standalone HTTP workflow (2026-10-02). Source access/licensing and the final Devpost submission remain owner delivery steps.
 - [x] Fix the Windows-only lockfile that broke `npm ci` on Linux: add the 73 missing platform entries at the locked versions and a regression test, `tests/lockfile-platforms.test.mjs`. Clean `npm ci`, build and lint verified on Linux on 2026-10-08. See [GITHUB-DELIVERY.md](GITHUB-DELIVERY.md#cross-platform-lockfile).
-- [x] Verify on Linux (Node.js 22.22.0) on 2026-10-08: 234/234 tests, typecheck, lint (0 errors), production build, `npm run test:demo:http` in rule mode and against the Bedrock mock, and a headless Chromium walkthrough with mocked speech APIs.
+- [x] Verify on Linux (Node.js 22.22.0) on 2026-10-08: 244/244 tests, typecheck, lint (0 errors), production build, `npm run test:demo:http` in rule mode and against the Bedrock mock, and a headless Chromium walkthrough with mocked speech APIs.
 - [ ] Test a clean clone on macOS.
 
 - [x] Add optional voice input after the text flow works reliably: a browser Web Speech API simulation in `/demo` with spoken replies and suggestion chips (2026-10-08). It is not Alexa and uses no Amazon voice service; tested only with mocked speech APIs.

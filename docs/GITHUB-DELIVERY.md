@@ -59,7 +59,7 @@ npm run test:demo:http
 
 Do not run database initialization, migrations or private-record seeding for this judge walkthrough. See [independent demo instructions](INDEPENDENT-DEMO.md), [local acceptance](FINAL-ACCEPTANCE.md), and [baseline ownership and feature boundaries](BASELINE.md).
 
-**Linux check on 2026-10-08** (container, Node.js 22.22.0, npm 10.9.4): a clean `npm ci`, `npm run build` and `npm run lint` (0 errors, 23 inherited warnings) passed after the lockfile fix below, and `npm test` passed 234/234. This ran in the development working copy, not a fresh GitHub clone. macOS has not been directly tested.
+**Linux check on 2026-10-08** (container, Node.js 22.22.0, npm 10.9.4): a clean `npm ci`, `npm run build` and `npm run lint` (0 errors, 23 inherited warnings) passed after the lockfile fix below, and `npm test` passed 244/244. This ran in the development working copy, not a fresh GitHub clone. macOS has not been directly tested.
 
 ## Cross-platform lockfile
 
