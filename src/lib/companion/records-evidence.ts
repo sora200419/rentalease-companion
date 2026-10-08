@@ -41,6 +41,9 @@ export function answerDeductionQuestion(records:Records,deductionId:string,quest
  // Selecting an item must not bypass the read-only, liability or secret guards.
  if(!['evidence','unsupported'].includes(basic.topic) || /\b(ignore|override|pretend|password|secret|other tenant|another tenant)\b/i.test(question))
    return {...basic,selection:'rules' as const};
- if(basic.topic === 'unsupported' && !/\b(sources?|citations?|files?)\b/i.test(question)) return {...basic,selection:'rules' as const};
+ // Condition questions about the selected item ("Was the scuff already there when I
+ // moved in?") are answered by quoting both reports, never by inferring a finding.
+ const condition=/\b(sources?|citations?|files?|already|before|pre ?existing|existed|originally|moved? (?:in|out)|first (?:arrived|moved)|condition|scuffs?|scratch(?:es)?|stains?|marks?|residue|dirty|clean(?:ed)?|keys?)\b/i;
+ if(basic.topic === 'unsupported' && !condition.test(question)) return {...basic,selection:'rules' as const};
  return deductionAnswer(records,deductionId);
 }

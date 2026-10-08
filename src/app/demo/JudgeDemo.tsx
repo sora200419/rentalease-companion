@@ -1,33 +1,38 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { JudgeSnapshot, Scenario } from '@/lib/companion/judge-demo';
+import type { JudgeMessage, JudgeSnapshot, Scenario } from '@/lib/companion/judge-demo';
 import type { ActionInput, ActionKind } from '@/lib/companion/records-actions';
 import { labels, optionsFor, routeDialogue } from '@/lib/companion/records-dialogue';
 import { money, parseMoney } from '@/lib/companion/records-workflow';
 import { settlementSummary } from '@/lib/companion/records-summary';
 import { evidenceNotices } from '@/lib/companion/records-evidence-notices';
+import { disputeTemplate, normalizeSpokenQuestion } from '@/lib/companion/voice';
+import VoiceAssistant from './VoiceAssistant';
+import McpConnect from './McpConnect';
 import styles from './demo.module.css';
 
 const fixed: Partial<Record<ActionKind, string>> = {
   ACCEPTANCE: 'I accept this landlord response.', ADJUSTMENT_ACCEPTANCE: 'I accept this proposed deduction amount.',
   DEDUCTION_ACCEPTANCE: 'I accept this recorded deduction.',
 };
-async function request(operation: string, body?: unknown): Promise<JudgeSnapshot> {
+type Snapshot = JudgeSnapshot & { assistant: { mode: 'bedrock' | 'rules'; model?: string } };
+async function request(operation: string, body?: unknown): Promise<Snapshot> {
+  // An AI answer may make several model and tool calls, so it gets a longer deadline.
   const response = await fetch('/api/judge/' + operation, { method: body ? 'POST' : 'GET', cache: 'no-store',
     credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(15000) });
+    body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(operation === 'assistant' ? 45000 : 15000) });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error ?? 'The demo request failed. Reload before retrying a confirmation.');
   return result;
 }
 export default function JudgeDemo() {
-  const [session, setSession] = useState<JudgeSnapshot | null>(null);
+  const [session, setSession] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [question, setQuestion] = useState(''), [kind, setKind] = useState<ActionKind | ''>('');
   const [text, setText] = useState(''), [amount, setAmount] = useState('');
   const [scenario, setScenario] = useState<Scenario>('STANDARD'), [newScenario, setNewScenario] = useState(false);
-  const initialRequest = useRef<Promise<JudgeSnapshot> | null>(null);
+  const initialRequest = useRef<Promise<Snapshot> | null>(null);
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -71,19 +76,30 @@ export default function JudgeDemo() {
     }
     await command('prepare', { action: { kind, payload } });
   }
-  async function ask() {
-    if (!session || !question.trim()) return;
-    const route = routeDialogue(session.records, session.selected, question);
-    if (await command('chat', { question })) {
-      choose(route.kind ?? ''); setAmount(route.amount); setQuestion('');
-    }
+  // Typed and spoken questions share one path. With Amazon Bedrock the server may
+  // return a ready preview; in rule mode the matching form is pre-selected here.
+  async function askAssistant(input: string): Promise<JudgeMessage | null> {
+    if (!session || !input.trim()) return null;
+    const spoken = normalizeSpokenQuestion(input);
+    const route = routeDialogue(session.records, session.selected, spoken);
+    const updated = await command('assistant', { question: input });
+    if (!updated) return null;
+    const answer = updated.messages.at(-1) ?? null;
+    if (answer?.provider !== 'bedrock' && !updated.pending) {
+      choose(route.kind ?? ''); setAmount(route.amount);
+      if (route.kind === 'DISPUTE') setText(disputeTemplate(updated.records));
+    } else clearDraft();
+    return answer;
   }
+  async function ask() { if (await askAssistant(question)) setQuestion(''); }
   const citation = (id: string) => id.startsWith('file:') ? '/api/judge/photo?id=' + encodeURIComponent(id.slice(5)) : '#source-' + id;
+  const assistant = session?.assistant ?? { mode: 'rules' as const };
+  const latest = session?.messages.at(-1) ?? null;
   return <main className={styles.page}>
-    <header className={styles.header}><a className={styles.brand} href="/guide">re. RentalEase</a><span className={styles.eyebrow}>Independent demonstration · no cloud keys</span></header>
+    <header className={styles.header}><a className={styles.brand} href="/guide">re. RentalEase</a><span className={styles.eyebrow}>{assistant.mode === 'bedrock' ? 'Amazon Bedrock connected' : 'Rule mode · no cloud keys needed'}</span></header>
     <div className={styles.intro}><p className={styles.eyebrow}>Evidence first. Decisions by you.</p><h1>A clearer end<br />to your tenancy.</h1>
-      <p>Review three deductions, hear both sides, and record each decision. All people, records and labelled photos are synthetic. Role switching simulates two people; it is not real account authentication.</p>
-      <p>Alexa+ track · simulated web experience. No official Alexa+ connection, photo analysis, legal ruling or payment.</p></div>
+      <p>Ask about any deposit deduction by voice or text. RentalEase reads the move-in and move-out records through its MCP tools, quotes the sources, and drafts a reply — but only you can confirm a decision.</p>
+      <p className={styles.small}>Alexa+ track · simulated experience. All people, records and labelled photos are synthetic; role switching simulates two people. No legal ruling or payment is made.</p></div>
     {error && <p className={styles.notice} role="alert">{error}</p>}
     {!session && <p role="status">Loading the local demonstration…</p>}
     <div className={styles.toolbar}>
@@ -98,6 +114,8 @@ export default function JudgeDemo() {
       </select><div className={styles.actions}><button disabled={busy} onClick={async () => { if (await command('start', { scenario, confirmed: true })) { clearDraft(); setNewScenario(false); } }}>Confirm new scenario</button><button disabled={busy} onClick={() => setNewScenario(false)}>Keep current case</button></div>
     </section>}
     {session && records && summary && <>
+      <VoiceAssistant role={records.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT'} mode={assistant.mode} model={assistant.model}
+        disabled={busy || !!session.pending} pending={!!session.pending} ask={askAssistant} latest={latest} />
       <div className={styles.metrics}><div>Recorded deposit<strong>{money(records.depositSen)}</strong></div><div>Current refund<strong>{money(records.settlement!.recordedRefundSen)}</strong></div><div>Resolved deductions<strong>{summary.resolvedCount} / 3</strong></div></div>
       <p>{summary.title} · {session.scenario.toLowerCase()} evidence · saved record revision {records.revision}. Proposed new amounts do not change the refund until accepted. No money is transferred.</p>
       <p className={styles.notice} role="status">{session.notice}</p>
@@ -122,6 +140,7 @@ export default function JudgeDemo() {
       </div><div>
         <section className={styles.panel}><p className={styles.eyebrow}>03 / Ask, review, confirm</p><h2>The rental conversation.</h2><p>Current context: {selected?.reason ?? 'none'}. Multi-item requests need clarification. Chat never confirms a decision.</p>
           <div className={styles.conversation} aria-label="Conversation history">{session.messages.map((message, i) => <article className={styles.message} key={i}><strong>You: {message.question}</strong><p className={styles.pre}>{message.text}</p>
+            <p className={styles.provider}>{message.provider === 'bedrock' ? `Amazon Bedrock · ${message.model} · MCP tools: ${message.tools?.join(' → ') || 'none'}${message.drafted ? ' · drafted a decision' : ''}` : 'Rule mode · quoted from the records'}</p>
             <div className={styles.citations}>{message.sourceIds.map(id => <a key={id} href={citation(id)} target={id.startsWith('file:') ? '_blank' : undefined} rel={id.startsWith('file:') ? 'noreferrer' : undefined}>{id}</a>)}</div></article>)}</div>
           <form onSubmit={e => { e.preventDefault(); void ask(); }}><label htmlFor="question">Ask about evidence or state a decision</label><textarea id="question" maxLength={600} value={question} onChange={e => setQuestion(e.target.value)} placeholder="Show evidence for the second deduction" disabled={busy} /><button disabled={busy || !question.trim()} type="submit">Send message</button></form>
           <form onSubmit={e => { e.preventDefault(); void prepare(); }}><label htmlFor="decision">Available action for this item</label><select id="decision" value={kind} disabled={busy || !!session.pending} onChange={e => choose(e.target.value as ActionKind | '')}>
@@ -131,7 +150,8 @@ export default function JudgeDemo() {
             {kind === 'ADJUSTMENT' && <><label htmlFor="amount">New proposed amount (MYR)</label><input id="amount" inputMode="decimal" value={amount} disabled={busy || !!session.pending} onChange={e => setAmount(e.target.value)} placeholder="20.00" /></>}
             <button type="submit" disabled={busy || !!session.pending || text.trim().length < 10}>Preview decision</button></>}
           </form>
-          {session.pending && <section className={styles.preview} aria-label="Decision preview"><h3>Check before saving</h3><p>{session.pending.role} · {session.pending.description}</p><p className={styles.pre}>{session.pending.action.payload.text}</p><p>Valid for five minutes. Confirming records this exact decision locally. Cancelling or refreshing discards the preview.</p>
+          {session.pending && <section className={styles.preview} aria-label="Decision preview"><h3>Check before saving</h3>
+            {latest?.drafted && <p className={styles.aiDraft}>Drafted by Amazon Bedrock from the quoted records. Read it carefully: you decide whether to save it.</p>}<p>{session.pending.role} · {session.pending.description}</p><p className={styles.pre}>{session.pending.action.payload.text}</p><p>Valid for five minutes. Confirming records this exact decision locally. Cancelling or refreshing discards the preview.</p>
             <div className={styles.actions}><button className={styles.primary} disabled={busy} onClick={async () => { if (await command('confirm', { id: session.pending!.id })) clearDraft(); }}>Confirm and save</button><button disabled={busy} onClick={async () => { if (await command('cancel')) clearDraft(); }}>Cancel preview</button></div></section>}
         </section>
         <section className={styles.panel}><h2>Shared decision history.</h2><p>Both demo roles see confirmed decisions. Drafts, cancelled previews and chat messages are not settlement events.</p>
@@ -139,7 +159,8 @@ export default function JudgeDemo() {
           <ol className={styles.history}>{records.history.filter(e => e.kind !== 'EVIDENCE_LINK').map(event => <li key={event.id}><strong>{labels[event.kind]}</strong><small>Revision {event.revision} · {event.actorId} · {event.createdAt}</small><p>{event.payload.text}</p>{event.payload.amountSen !== undefined && <p>Proposed: {money(event.payload.amountSen)}</p>}</li>)}</ol>
         </section>
       </div></div>
+      <McpConnect role={records.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT'} />
     </>}
-    <footer className={styles.footer}>Local synthetic demonstration · No Supabase, AWS or model credentials required. <a href="/guide">Walkthrough guide</a></footer>
+    <footer className={styles.footer}>Local synthetic demonstration · Amazon Bedrock is optional; without it the rule assistant answers. <a href="/guide">Walkthrough guide</a></footer>
   </main>;
 }

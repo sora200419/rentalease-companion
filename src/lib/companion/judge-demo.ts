@@ -3,6 +3,7 @@ import { parseAction, validateWorkflowAction, type ActionInput } from './records
 import { eventDeduction, money, revisedRefund, type Records } from './records-workflow';
 import { labels, optionsFor, routeDialogue } from './records-dialogue';
 import { answerDeductionQuestion } from './records-evidence';
+import { speakable, spokenEvidence } from './voice';
 
 export type Scenario = 'STANDARD' | 'MISSING' | 'CONFLICTING';
 export type DemoRole = 'TENANT' | 'LANDLORD';
@@ -21,8 +22,18 @@ export type JudgeSession = {
   records: Records;
   pending: { id: string; revision: number; role: DemoRole; action: ActionInput; expiresAt: number; description: string } | null;
   receipts: string[];
-  messages: { role: DemoRole; question: string; text: string; sourceIds: string[] }[];
+  messages: JudgeMessage[];
   notice: string;
+  // Per-role bearer tokens for local MCP clients; never included in snapshots.
+  mcp?: Record<DemoRole, string>;
+};
+export type JudgeMessage = {
+  role: DemoRole; question: string; text: string; sourceIds: string[];
+  speech?: string; provider?: 'rules' | 'bedrock'; model?: string; tools?: string[]; drafted?: boolean;
+};
+export type AssistantTurn = {
+  question: string; text: string; speech: string; sourceIds: string[];
+  model: string; tools: string[]; focus: string | null; draft: ActionInput | null;
 };
 
 export function newJudgeSession(scenario: Scenario = 'STANDARD'): JudgeSession {
@@ -57,7 +68,9 @@ export function newJudgeSession(scenario: Scenario = 'STANDARD'): JudgeSession {
 }
 
 export function judgeSnapshot(session: JudgeSession) {
-  return { ...session, receipts: [], messages: session.messages.filter(m => m.role === session.records.role),
+  const visible: Omit<JudgeSession, 'mcp'> & { mcp?: unknown } = { ...session };
+  delete visible.mcp;
+  return { ...visible, receipts: [], messages: session.messages.filter(m => m.role === session.records.role),
     pending: session.pending && session.pending.expiresAt > Date.now() ? session.pending : null,
     photos: photoIndex.filter(p => session.records.evidence.some(r => r.id === p.reportId)) };
 }
@@ -94,10 +107,12 @@ export function applyJudgeCommand(before: JudgeSession, operation: string, value
     session.selected = route.deductionId; session.pending = null;
     const answer = route.question && session.selected ? answerDeductionQuestion(records, session.selected, input.question) : null;
     const text = answer?.text ?? route.notice;
-    session.messages.push({ role: records.role as DemoRole, question: input.question, text, sourceIds: answer?.sourceIds ?? [] });
+    const speech = answer?.topic === 'evidence' ? spokenEvidence(records, session.selected) ?? speakable(text) : speakable(text);
+    session.messages.push({ role: records.role as DemoRole, question: input.question, text, sourceIds: answer?.sourceIds ?? [], speech, provider: 'rules' });
     session.messages = session.messages.slice(-80);
     session.notice = route.notice;
-    // Chat can select a form, never prepare or confirm a business write.
+    // Rule-mode chat can only select a form. AI drafts become previews through
+    // recordAssistantTurn below; nothing in either path confirms a business write.
   } else if (operation === 'prepare') {
     const action = parseAction(input.action);
     if (['REPORT', 'EVIDENCE_LINK'].includes(action.kind)) throw new Error('This walkthrough uses bundled synthetic evidence only.');
@@ -136,6 +151,38 @@ export function applyJudgeCommand(before: JudgeSession, operation: string, value
     session.receipts.push(records.role + ':' + pending.id); session.pending = null;
     session.notice = 'Confirmed and saved locally. No payment was made.';
   }
+  session.revision++;
+  return session;
+}
+
+// Records an AI assistant answer. A draft becomes the ordinary "Check before saving"
+// preview through the same prepare command a person uses; nothing is confirmed here.
+export function recordAssistantTurn(before: JudgeSession, revision: number, turn: AssistantTurn): JudgeSession {
+  if (revision !== before.revision) throw new Error('This demo changed in another tab. Reload and review the latest state.');
+  const session = structuredClone(before);
+  const role = session.records.role as DemoRole;
+  const deductions = session.records.settlement?.deductions ?? [];
+  const message: JudgeMessage = { role, question: turn.question, text: turn.text, speech: turn.speech, sourceIds: turn.sourceIds,
+    provider: 'bedrock', model: turn.model, tools: turn.tools, drafted: false };
+  session.messages.push(message); session.messages = session.messages.slice(-80);
+  session.pending = null;
+  if (turn.draft) {
+    const draft = turn.draft;
+    const target = draft.payload.deductionId ?? eventDeduction(session.records, session.records.history.find(e => e.id === (draft.payload.responseId ?? draft.payload.adjustmentId ?? draft.payload.disputeId)));
+    try {
+      let next = session;
+      if (target && target !== next.selected) next = applyJudgeCommand(next, 'select', { revision: next.revision, deductionId: target });
+      next = applyJudgeCommand(next, 'prepare', { revision: next.revision, action: draft });
+      next.messages[next.messages.length - 1].drafted = true;
+      next.notice = 'AI drafted this decision. Check it below, then confirm or cancel. Nothing has been saved.';
+      return next;
+    } catch {
+      message.text += '\n\nI could not turn that draft into a valid decision for this item. Use the action menu instead.';
+      message.speech += ' I could not prepare that draft. Please use the action menu.';
+    }
+  }
+  if (turn.focus && deductions.some(d => d.id === turn.focus)) session.selected = turn.focus;
+  session.notice = 'Answered by Amazon Bedrock using the RentalEase MCP tools. Nothing has been saved.';
   session.revision++;
   return session;
 }
