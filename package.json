@@ -2,6 +2,7 @@
   "name": "rentalease-companion",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "test": "node scripts/test-workflows.mjs",
     "test:mcp": "node scripts/test-workflows.mjs --mcp",
@@ -32,6 +33,7 @@
   },
   "description": "RentalEase Move-Out Companion: an evidence-based tenancy assistant, built on the RentalEase FYP baseline.",
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1147.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^5.2.2",
     "@modelcontextprotocol/sdk": "1.30.1",

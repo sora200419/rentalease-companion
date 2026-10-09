@@ -1,8 +1,10 @@
-# GitHub delivery — 2026-10-02
+# GitHub delivery — 2026-10-02, updated 2026-10-08
 
-Repository: [sora200419/rentalease-companion](https://github.com/sora200419/rentalease-companion).
+Repository: [sora200419/rentalease-companion](https://github.com/sora200419/rentalease-companion). The repository is public and includes an MIT `LICENSE`.
 
 The final submission candidate includes the independent three-item `/demo`, bundled labelled synthetic photos, missing/conflicting evidence scenarios, confirmed dispute resolution, private records workflows and the separately tested local MCP adapter. Formal Alexa+ integration remains future work.
+
+The 2026-10-08 changes postdate the 2026-10-02 checkpoint below: the browser voice simulation and optional Amazon Bedrock assistant in `/demo` ([VOICE-ASSISTANT.md](VOICE-ASSISTANT.md)), the demo MCP endpoint ([MCP.md](MCP.md)), the [cross-platform lockfile](#cross-platform-lockfile) fix and the MIT `LICENSE`.
 
 ## Judge startup
 
@@ -15,7 +17,9 @@ npm ci
 npm run dev:companion
 ```
 
-Open **http://127.0.0.1:3030/guide** and start the independent demo. No environment file or cloud credentials are required. Private repository access must be arranged by the owner before judging.
+Open **http://127.0.0.1:3030/guide** and start the independent demo; in this mode `/` also redirects to `/guide`. In the default rule mode no environment file or cloud credentials are required. Amazon Bedrock is optional and stays off unless `COMPANION_BEDROCK_MODEL` is set; see [VOICE-ASSISTANT.md](VOICE-ASSISTANT.md).
+
+`npm ci` installs the exact lockfile. Do not run `npm install` on Windows and commit the result; see [cross-platform lockfile](#cross-platform-lockfile).
 
 ## Delivered-revision checks
 
@@ -55,6 +59,18 @@ npm run test:demo:http
 
 Do not run database initialization, migrations or private-record seeding for this judge walkthrough. See [independent demo instructions](INDEPENDENT-DEMO.md), [local acceptance](FINAL-ACCEPTANCE.md), and [baseline ownership and feature boundaries](BASELINE.md).
 
+**Linux check on 2026-10-08** (container, Node.js 22.22.0, npm 10.9.4): a clean `npm ci`, `npm run build` and `npm run lint` (0 errors, 23 inherited warnings) passed after the lockfile fix below, and `npm test` passed 244/244. This ran in the development working copy, not a fresh GitHub clone. macOS has not been directly tested.
+
+## Cross-platform lockfile
+
+**What broke.** `package-lock.json` had been generated on Windows and listed only the Windows builds of the native optional packages for lightningcss, `@tailwindcss/oxide`, sharp and unrs-resolver (a known npm issue, npm/cli#4828). On Linux, `npm ci && npm run dev:companion` failed with `Cannot find module '../lightningcss.linux-x64-gnu.node'`. macOS is expected to fail the same way but was not directly tested. The 2026-10-02 clone check above ran on Windows, so it could not catch this.
+
+**What was fixed (2026-10-08).** The 73 missing platform entries were added at the exact locked versions. All 544 original entries are unchanged. The Linux check above was run on the fixed lockfile.
+
+**How it is protected.** `tests/lockfile-platforms.test.mjs` runs as part of `npm test`. For every lockfile package that has platform-specific optional dependencies (win32, darwin, linux, linuxmusl, android, freebsd, wasm32), it fails if any of those platform packages is missing from the lockfile. To run it alone from the repository root: `node --test tests/lockfile-platforms.test.mjs`.
+
+**If it fails.** If it fails after `npm install` was run on Windows, do not commit that lockfile. Restore `package-lock.json` from Git, then add or update dependencies from macOS or Linux instead; adding `@aws-sdk/client-bedrock-runtime` on Linux kept all entries. Run `npm test` again before committing.
+
 ## Owner delivery items
 
-Source access/licensing, the English video, final Devpost copy and actual submission remain owner delivery steps. Syncing source does not change repository visibility, add collaborators or publish an open-source licence.
+The repository is public and includes an MIT `LICENSE` (copyright sora200419). The English video, final Devpost copy and actual submission remain owner delivery steps.

@@ -94,4 +94,40 @@ assert.match(state.messages.at(-1).text, /both keys were returned/);
 assert.match(state.messages.at(-1).text, /no conflict has been resolved/);
 cookie = originalCookie; state = await call('session');
 assert.deepEqual(state.records, retained, 'new scenarios must preserve old history');
-console.log('PASS: standalone HTTP workflow, isolation, confirmation/cancel/resume, source citations, four exact photo files, missing/conflicting evidence. No cloud credentials used.');
+
+// Voice/typed assistant: rule mode by default; Amazon Bedrock only when the server opted in.
+state = await call('start', { scenario: 'STANDARD', confirmed: true });
+await command('assistant', { question: 'Alexa, ask RentalEase whether the scuff was already there when I moved in' });
+const spoken = state.messages.at(-1);
+assert.equal(spoken.question, 'Whether the scuff was already there when I moved in');
+assert.ok(spoken.speech && !spoken.speech.includes('['), 'answers carry speakable text without citation markers');
+if (state.assistant.mode === 'rules') {
+  assert.equal(spoken.provider, 'rules'); assert.match(spoken.text, /A short scuff was recorded below the bedroom window/);
+} else assert.ok(spoken.provider === 'bedrock' || /^Amazon Bedrock was unavailable/.test(state.notice));
+assert.equal(state.records.revision, 0, 'asking never changes records');
+
+// MCP: the same six read-only tools over Streamable HTTP with the case's bearer token.
+const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+const connection = await call('mcp');
+assert.equal(connection.url, base + '/api/mcp'); assert.match(connection.tokens.TENANT, /^rle_demo_/);
+const mcpPost = headers => fetch(connection.url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(30000),
+  headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers },
+  body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) });
+const anonymous = await mcpPost({});
+assert.equal(anonymous.status, 401); assert.match(anonymous.headers.get('www-authenticate') ?? '', /^Bearer/);
+assert.equal((await mcpPost({ authorization: 'Bearer rle_demo_' + 'A'.repeat(43) })).status, 401);
+assert.equal((await mcpPost({ authorization: 'Bearer ' + connection.tokens.TENANT, origin: 'https://example.com' })).status, 403);
+const client = new Client({ name: 'judge-http-check', version: '1.0.0' });
+await client.connect(new StreamableHTTPClientTransport(new URL(connection.url), { requestInit: { headers: { authorization: 'Bearer ' + connection.tokens.TENANT } } }));
+try {
+  assert.equal((await client.listTools()).tools.length, 6);
+  const answer = await client.callTool({ name: 'ask_records', arguments: { tenancyId: 'judge-synthetic-tenancy', deductionId: 'wall', question: 'Was the scuff already there when I moved in?' } });
+  assert.match(answer.structuredContent.answer.text, /A short scuff was recorded below the bedroom window/);
+  const draft = await client.callTool({ name: 'prepare_dispute_action', arguments: { tenancyId: 'judge-synthetic-tenancy', expectedRevision: 0,
+    action: { kind: 'DISPUTE', payload: { deductionId: 'wall', text: 'The move-in report already records this scuff.' } } } });
+  assert.equal(draft.structuredContent.saved, false);
+} finally { await client.close(); }
+const afterMcp = await call('session'); assert.equal(afterMcp.records.revision, 0); assert.equal(afterMcp.pending, null);
+console.log('PASS: standalone HTTP workflow, isolation, confirmation/cancel/resume, source citations, four exact photo files, missing/conflicting evidence, ' +
+  `voice assistant (${state.assistant.mode} mode) and bearer-token MCP tools. No cloud credentials required.`);

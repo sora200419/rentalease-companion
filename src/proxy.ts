@@ -80,7 +80,9 @@ export default function proxy(req: NextRequest, event: NextFetchEvent) {
     return NextResponse.json({ error: 'Only scoped records APIs are enabled in this mode.' }, { status: 503 });
   }
   if (process.env.COMPANION_OFFLINE_DEMO === '1') {
-    if (/^\/api\/judge\/(session|start|resume|role|select|prepare|confirm|cancel|chat|photo)$/.test(req.nextUrl.pathname)) return NextResponse.next();
+    // The MCP adapter checks host, origin and its per-case bearer token itself.
+    if (req.nextUrl.pathname === '/api/mcp') return NextResponse.next();
+    if (/^\/api\/judge\/(session|start|resume|role|select|prepare|confirm|cancel|chat|assistant|photo|mcp)$/.test(req.nextUrl.pathname)) return NextResponse.next();
     if (/^\/api\/companion\/(session|resume|role|reset|prepare|confirm|cancel|chat)$/.test(req.nextUrl.pathname)) return NextResponse.next();
     return NextResponse.json({ error: 'Backend services are disabled in the offline companion demo.' }, { status: 503 });
   }

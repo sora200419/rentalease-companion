@@ -82,6 +82,9 @@ Acceptance: cross-tenancy requests fail; missing or disputed baseline evidence r
 - [x] Implement an offline-tested remote JWT access-token verifier, scope-aware MCP adapter, resource metadata and per-request grant/revocation checks; keep the adapter unmounted and disabled.
 - [x] Verify the official Alexa+ access boundary: the hackathon FAQ offers no participant access to the gated partner tools; local simulation is an accepted route (2026-09-28).
 - [ ] Configure a managed OAuth provider, explicit consent/account-linking flow and persistent revocation storage; validate PKCE/refresh with a real provider before approved remote hosting.
+- [x] Serve the same six read-only MCP tools from the independent demo at `http://127.0.0.1:3030/api/mcp` with per-case, per-role bearer tokens; deduction decisions only, no confirm, payment, SQL or URL tool. Verified with the MCP Inspector CLI 2.9.0 and an SDK client over HTTP (2026-10-08). The Claude Code and Claude Desktop recipes were not verified against this endpoint in a real client install. See [MCP.md](MCP.md).
+- [x] Add an optional Amazon Bedrock (Converse) assistant to `/demo` that reads the case only through the MCP tools, drafts only through `prepare_dispute_action` and falls back to the rule assistant (2026-10-08). Mock-verified only: tested against a local mock Converse server, not a live AWS account. See [VOICE-ASSISTANT.md](VOICE-ASSISTANT.md).
+- [ ] Run the Bedrock assistant with real AWS credentials and record the observed answers, tool use, latency and cost in [FRICTION_LOG.md](FRICTION_LOG.md).
 
 - [ ] Add a model-provider boundary and migrate the legacy Gemini SDK if Gemini remains in use.
 - [x] Store account/tenancy-scoped conversation and selected item for the browser session; re-read authoritative state on reload. Cross-device conversation history remains out of scope.
@@ -107,14 +110,20 @@ Acceptance: a changed file fails verification; a pending transaction is never la
 - [x] Complete the new independent demo's browser workflow and 320/390/760/1280px responsive QA (2026-09-29; keyboard/form interaction, not physical-device certification).
 - [x] Verify a clean local candidate without environment files: locked installation, 209 tests, production build and standalone HTTP workflow (2026-09-29).
 - [x] Synchronize the candidate to GitHub and verify a fresh clone: installation, 209 tests, TypeScript, lint, build and standalone HTTP workflow (2026-10-02). Source access/licensing and the final Devpost submission remain owner delivery steps.
+- [x] Fix the Windows-only lockfile that broke `npm ci` on Linux: add the 73 missing platform entries at the locked versions and a regression test, `tests/lockfile-platforms.test.mjs`. Clean `npm ci`, build and lint verified on Linux on 2026-10-08. See [GITHUB-DELIVERY.md](GITHUB-DELIVERY.md#cross-platform-lockfile).
+- [x] Verify on Linux (Node.js 22.22.0) on 2026-10-08: 244/244 tests, typecheck, lint (0 errors), production build, `npm run test:demo:http` in rule mode and against the Bedrock mock, and a headless Chromium walkthrough with mocked speech APIs.
+- [ ] Test a clean clone on macOS.
 
-- [ ] Add optional voice input after the text flow works reliably.
+- [x] Add optional voice input after the text flow works reliably: a browser Web Speech API simulation in `/demo` with spoken replies and suggestion chips (2026-10-08). It is not Alexa and uses no Amazon voice service; tested only with mocked speech APIs.
+- [ ] Test a physical microphone and speaker in Chrome and Edge.
 - [ ] Record an English demo shorter than three minutes.
 - [x] Add a read-only item-progress summary and authenticated current-snapshot text export with source references.
 - [x] Provide a mode-aware in-app demo guide, reproducible local judge instructions and documented limitations.
 - [x] Prepare an English Devpost draft and timed demo script; owner review and actual recording remain pending.
 - [x] Record observed local-model friction; no Amazon runtime/SDK testing is claimed.
+- [x] Record 2026-10-08 development friction (lockfile, AWS SDK against a mock, MCP-to-Converse schemas, inference profiles, MCP Inspector, Web Speech API). Owner review and additions pending.
 - [x] Recheck the official Alexa+ simulated web-experience alternative on 2026-09-26; no AWS integration is claimed.
-- [ ] Agree source access/licensing and safe remote judge access before final submission; do not publish the development credentials.
+- [x] Source access and licensing: the repository is public with an MIT `LICENSE` (2026-10-08).
+- [ ] Agree safe remote judge access before final submission, if needed beyond a local clone; do not publish the development credentials.
 
 Out of scope for this MVP: automatic payments, legal adjudication, a complete repair marketplace, public identity documents, tokens, and mandatory tenant wallets.

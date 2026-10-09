@@ -1,6 +1,6 @@
 # Remote MCP acceptance plan — verification core implemented, not deployed
 
-Current live capability: local Streamable HTTP, records-cookie authorization, six read/preview tools and process-local request protection. A separate bearer-token verification core and HTTP adapter now have offline integration tests. They are not mounted in the application or connected to an identity provider. This is not a complete OAuth/account-linking implementation, an Alexa+ approval, or permission to publish the development database.
+Current live capability: local Streamable HTTP, records-cookie authorization, local per-case bearer tokens for the independent demo (added 2026-10-08), six read/preview tools and process-local request protection. A separate bearer-token verification core and HTTP adapter now have offline integration tests. They are not mounted in the application or connected to an identity provider. This is not a complete OAuth/account-linking implementation, an Alexa+ approval, or permission to publish the development database.
 
 ## Implemented and verified offline — 2026-09-28
 
@@ -20,7 +20,9 @@ The official hackathon FAQ checked on 2026-09-28 says the gated preview tools ar
 
 ## Work that can stay local
 
-Keep testing protocol, exact source retrieval, role separation, revision checks, malformed requests, throttling and network failures with synthetic services. Do not create public tunnels, AWS resources, cloud model calls or new credentials as part of this stage. The current application remains loopback-only and rejects bearer-token requests.
+Keep testing protocol, exact source retrieval, role separation, revision checks, malformed requests, throttling and network failures with synthetic services. Do not create public tunnels, AWS resources, cloud model calls or new credentials as part of this stage. The demo's optional Amazon Bedrock assistant is separate from remote MCP access: it is off unless the person running the demo configures it, and calls the MCP tools in-process ([VOICE-ASSISTANT.md](VOICE-ASSISTANT.md)). The current application remains loopback-only. The records endpoint still rejects bearer-token requests.
+
+Since 2026-10-08 the independent demo endpoint (`http://127.0.0.1:3030/api/mcp`) accepts local per-case, per-role bearer tokens so native MCP clients can read its synthetic case. These are random tokens issued by the demo page and checked against a local file store. They are not OAuth access tokens, are not verified by `mcp-authorization.ts`, and do not enable remote access: the endpoint still requires the loopback Host and a same-origin or absent Origin. Remote OAuth, account linking and consent remain unimplemented. See [MCP.md](MCP.md) for the token model.
 
 ## Remote identity and consent
 

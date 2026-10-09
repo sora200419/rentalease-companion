@@ -55,7 +55,8 @@ export function routeDialogue(records: Records, selected: string, message: strin
  const generic = new Set(['the','a','an','for','of','and','deduction','charge','cost','fee','replacement']);
  const named = deductions.flatMap((d, index) => {
    const tokens = d.reason.toLowerCase().match(/[a-z]+/g) ?? [];
-   return tokens.some(token => token.length > 2 && !generic.has(token) && new RegExp('\\b' + token + '\\b').test(text)) ? [index] : [];
+   // Accept simple plurals: "the keys" names the "Replacement key" deduction.
+   return tokens.some(token => token.length > 2 && !generic.has(token) && new RegExp('\\b' + token + 's?\\b').test(text)) ? [index] : [];
  });
  for (const name of named) indices.add(name);
  if (indices.size > 1) return stop('The message names different deductions. Please choose one deduction and one decision. Nothing has been prepared.');
@@ -130,7 +131,8 @@ export function routeDialogue(records: Records, selected: string, message: strin
    return stop('Please write one exact amount using MYR and digits before choosing this decision.');
  const unavailable=!!kind&&!has(kind);
  if (unavailable) kind=null;
- const question=/^(?:please\s+)?(?:why|what|who|how|show|find|compare|check|which|where|was|were|is|are|can|could)\b|evidence|photo|source|证据|照片/.test(text)&&!actionWords;
+ // Spoken requests often arrive as "whether ..." or "tell me if ..." after a voice invocation.
+ const question=/^(?:please\s+)?(?:why|what|who|how|show|find|compare|check|which|where|was|were|is|are|can|could|whether|if|did|does|do|has|had|tell me|explain|describe)\b|evidence|photo|source|证据|照片/.test(text)&&!actionWords;
  return {deductionId,kind,reportType,amount:kind==='ADJUSTMENT'?amounts[0]??'':'',question:question&&!kind,
    notice:kind?'Review the selected deduction and complete the draft below. Nothing has been saved.'
      :unavailable?'That action is unavailable for your role or the current deduction. Choose one of the available actions below.'

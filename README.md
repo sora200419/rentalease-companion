@@ -1,25 +1,68 @@
 # RentalEase Move-Out Companion
 
-An evidence-based assistant for tenants and landlords completing a move-out and deposit settlement.
+**Ask about a deposit deduction out loud, hear what the move-in and move-out records actually say, and let the assistant draft your reply — but only you can confirm a decision.**
 
-**Status: experimental English prototype.** `/demo` is the independent three-item, credential-free walkthrough. `/companion` retains the earlier single-item local-AI experiment. `/records` provides credential-based login, server-authorized Supabase records, source-cited Q&A, confirmed dispute decisions, and private evidence files using synthetic development accounts. Q&A is read-only; a separate limited action conversation routes into explicit confirmation forms. Production hardening and formal Alexa+ integration remain pending. Passing tests does not establish complete factual accuracy or submission readiness. See [model evaluation](docs/LOCAL-MODEL.md), [database setup/security limitations](docs/SUPABASE-DEVELOPMENT.md), and [private evidence and workflow boundaries](docs/PRIVATE-EVIDENCE.md).
+An evidence-based voice assistant for tenants and landlords settling a rental deposit, built for the **Alexa+ track** of the Amazon Developer Hackathon as a simulated experience. Answers come from Amazon Bedrock (optional) or deterministic rules, always through the project's own MCP server.
 
-## Start here: independent, credential-free demo
+![The Ask RentalEase voice card answering "whether the scuff was already there when I moved in" by quoting the move-in and move-out reports (rule mode, no cloud keys)](docs/images/voice-rule-mode.png)
 
-Use Node.js 22 and a short checkout path on Windows (for example, `C:/dev/rentalease-companion`). Install and start:
+## Start here: three commands, no cloud keys
+
+Use Node.js 22 (on Windows, a short checkout path such as `C:/dev/rentalease-companion`).
 
 ```sh
 npm ci
 npm run dev:companion
 ```
 
-Open **http://127.0.0.1:3030/demo**, or `/guide` for the in-app walkthrough. Keep the exact `127.0.0.1:3030` address: this local demo checks its host and origin.
+Open **http://127.0.0.1:3030** (it redirects to the guide) or go straight to **http://127.0.0.1:3030/demo**. Keep the exact `127.0.0.1:3030` address: this local demo checks its host and origin.
 
-This new three-item demonstration runs without Supabase, AWS or model credentials. It includes four labelled synthetic photos and standard, missing-baseline and conflicting-account scenarios. Tenant and landlord roles can dispute, reply, reject, revise, accept and withdraw, with a separate preview and confirmation for each decision. New scenarios retain old local histories rather than resetting them.
+Then try:
 
-The original single-item `/companion` workspace and private `/records` workspace remain separate and unchanged in purpose. See the [independent demo guide](docs/INDEPENDENT-DEMO.md) for the complete walkthrough, storage boundaries and verification status. Test the running demo with `npm run test:demo:http`.
+1. **Voice.** In Chrome or Edge, tap the light ring and ask *"Was the scuff already there when I moved in?"* (an optional *"Alexa, ask RentalEase…"* prefix works too). Without a microphone, tap a suggestion chip. The answer quotes both reports, shows source chips and is read aloud.
+2. **A drafted decision.** Say or tap *"Dispute the wall charge for me"*. The draft appears as a **Check before saving** preview, or as a pre-filled form in rule mode. Press **Confirm and save** yourself.
+3. **Both sides.** Switch to **Landlord · Daniel** to reply, propose a new amount or withdraw. Resolve all three deductions; the intended outcome is a MYR 1,755 recorded refund. No money is transferred.
+4. **MCP.** Open **Connect an MCP client to this case** at the bottom of the page and run the MCP Inspector command it shows.
 
-The submission candidate passed 209 automated regressions, a production build, the complete local HTTP workflow and browser responsive checks on 2026-09-29. See [acceptance scope](docs/FINAL-ACCEPTANCE.md) and [GitHub delivery verification](docs/GITHUB-DELIVERY.md). The intended outcome is three resolved deductions and a MYR 1,755 recorded refund; no money is transferred.
+Everything runs without Supabase, AWS or model credentials. It uses synthetic people, records and four visibly labelled AI-generated photos, with standard, missing-baseline and conflicting-account scenarios. New scenarios keep old local histories.
+
+## Optional: Amazon Bedrock answers
+
+Set `COMPANION_BEDROCK_MODEL` (for example `apac.amazon.nova-pro-v1:0` in Malaysia/Singapore) plus AWS credentials or a Bedrock API key in `.env.local`, then restart. An Amazon Nova model then:
+
+- reads the case through the RentalEase MCP tools;
+- answers in short spoken sentences with checked citations;
+- turns "dispute this" requests into a draft preview.
+
+It never decides liability or saves anything. An amount in a draft (for example a landlord's revised offer) changes nothing until a person confirms it, and a revised amount still needs the tenant's acceptance. Any Bedrock failure falls back visibly to the rule assistant. See [voice assistant and Bedrock setup](docs/VOICE-ASSISTANT.md).
+
+The Bedrock path is tested end to end with the real AWS SDK against a local mock Converse server (`scripts/mock-bedrock.mjs`). A live AWS call was not made in the development environment.
+
+## MCP server
+
+`npm run dev:companion` also serves a Model Context Protocol endpoint at `http://127.0.0.1:3030/api/mcp`:
+
+- protocol `2025-11-25`, Streamable HTTP, official TypeScript SDK;
+- per-case bearer tokens shown on the demo page;
+- six read-only tools: tenancy list, settlement context, deduction evidence, agreement, questions, and draft checking.
+
+There is no confirm or payment tool. Recipes for MCP Inspector, Claude Code and Claude Desktop are in [MCP.md](docs/MCP.md).
+
+## Verification
+
+On 2026-10-08, in a Linux container:
+
+- `npm test`: 244/244 regressions pass.
+- TypeScript, lint and the production build pass.
+- `npm run test:demo:http` passes against the running demo in rule mode and in Bedrock-mock mode.
+- The official MCP Inspector CLI listed and called the tools against the live endpoint.
+- A headless-browser walkthrough with mocked speech APIs passed in both modes.
+
+**Not verified:** a live Amazon Bedrock call, real microphone hardware, Safari/Firefox, and a macOS clean clone.
+
+The earlier submission candidate's browser, responsive and clean-install acceptance is recorded in [acceptance scope](docs/FINAL-ACCEPTANCE.md) and [GitHub delivery verification](docs/GITHUB-DELIVERY.md). That page also explains the cross-platform lockfile fix.
+
+The original single-item `/companion` workspace and the private `/records` workspace remain separate. See the [independent demo guide](docs/INDEPENDENT-DEMO.md) for the full walkthrough and storage boundaries. [Model evaluation](docs/LOCAL-MODEL.md), [database setup/security limitations](docs/SUPABASE-DEVELOPMENT.md) and [private evidence boundaries](docs/PRIVATE-EVIDENCE.md) cover the records workspace.
 
 ## Try authenticated Supabase records
 
@@ -33,13 +76,13 @@ The **Review at a glance** summary shows each item's contribution and next step,
 
 Open `/guide` for the English demonstration guide. It clearly distinguishes the Alexa+ simulation from formal runtime integration and the retained closed database case from the repeatable local walkthrough.
 
-The records conversation now calls a real local **MCP Streamable HTTP** endpoint (`/api/mcp`, protocol `2025-11-25`) using the official SDK. Six authorized tools cover tenancy discovery, settlement context, evidence, agreement text, questions and read-only action previews. Saving remains a separate human confirmation in the records page; MCP exposes no confirmation or payment tool. See [MCP setup, tests and deployment boundaries](docs/MCP.md). Run `npm run test:mcp` for credential-free protocol and safety checks. AWS deployment and formal Alexa+ account linking are not implemented.
+The records conversation calls its own local **MCP Streamable HTTP** endpoint (`http://127.0.0.1:3031/api/mcp`, protocol `2025-11-25`) with the official SDK, authenticated by the records login session. The six tools are the same ones the independent demo serves on port 3030. Saving remains a separate human confirmation in the records page; MCP exposes no confirmation or payment tool. See [MCP setup, tests and deployment boundaries](docs/MCP.md). Run `npm run test:mcp` for credential-free protocol and safety checks. AWS hosting and formal Alexa+ account linking are not implemented.
 
-Local MCP requests have account-scoped rate limits, concurrent-request caps and bounded body reads. The web client times out after 20 seconds without automatically retrying an action. These limits protect the single-process development workspace; they are not distributed production controls or an AWS spending cap. See the [remote integration acceptance plan](docs/MCP-REMOTE-PLAN.md) before changing the loopback-only policy.
+Both local MCP endpoints have per-account rate limits, concurrent-request caps and bounded body reads. The records web client times out after 20 seconds without automatically retrying an action. These limits protect a single-process local workspace; they are not distributed production controls or an AWS spending cap. See the [remote integration acceptance plan](docs/MCP-REMOTE-PLAN.md) before changing the loopback-only policy.
 
 Fixture A retains the earlier reply-acceptance test. Fixture B contains three synthetic deductions for a retained multi-item walkthrough; do not reset either fixture to repeat a demo. `npm run test:records:resolution` checks the full state machine in a rolled-back database transaction. The private evidence reader supports confirmed PNG/JPEG/PDF uploads, authorized original downloads, paired image previews and deduction-specific file references. Four visibly labelled AI-generated photographs are under `demo-assets/evidence/` (outside the public folder). See [setup and limits](docs/PRIVATE-EVIDENCE.md).
 
-For optional local AI source selection, start the installed model with `npm run model:serve`, then start the records server with `npm run dev:records -- --local-model`. Ask "Was the scuff already there when I first arrived?" The model selects authorized source IDs; the server displays exact source text and keeps both move-in and move-out context. Invalid or unavailable AI falls back visibly. Amounts and actions remain rule-based. Verify with `node scripts/test-records-http.mjs --local-model`.
+For the earlier optional local-AI experiment in the records workspace, start the installed model with `npm run model:serve`, then start the records server with `npm run dev:records -- --local-model`. Ask "Was the scuff already there when I first arrived?" The model selects authorized source IDs; the server displays exact source text and keeps both move-in and move-out context. Invalid or unavailable AI falls back visibly. Amounts and actions remain rule-based. Verify with `node scripts/test-records-http.mjs --local-model`.
 
 ## Try the zero-spend prototype
 
@@ -57,11 +100,11 @@ See the [walkthrough](docs/DEMO.md) and [local service, model setup and limitati
 
 ## What we are building
 
-A tenant asks: "My landlord proposed a RM300 wall-repair deduction, but the mark was there when I moved in. Help me find the record and respond."
+A tenant asks: "My landlord proposed a RM100 wall-repainting deduction, but the mark was there when I moved in. Help me find the record and respond."
 
-The planned assistant retrieves the relevant tenancy, report, photos, and contract clauses; presents sources; drafts a response; and submits an action only after the correct user confirms it. The landlord can review the evidence and resolve the proposal. Both parties can return later to see progress.
+The assistant retrieves the relevant report, photos and agreement clause through its MCP tools, presents the sources, drafts a response and records a decision only after the correct person confirms it. The landlord can review the same evidence and reply, propose a new amount or withdraw. Both parties can return later to see progress. A real Alexa+ integration would reuse the same MCP server; that runtime is not connected here (see [Alexa+ access](docs/ALEXA-ACCESS.md)).
 
-The assistant will organize evidence and coordinate existing workflows. It will not decide legal liability, sign agreements, or transfer money automatically.
+The assistant organizes evidence and coordinates the existing workflow. It does not decide legal liability, sign agreements, or transfer money.
 
 ## Existing baseline
 
@@ -116,6 +159,8 @@ npm run build
 
 - [Original baseline and new-work boundaries](docs/BASELINE.md)
 - [Judge guide and repeatable walkthrough](docs/JUDGE-GUIDE.md)
+- [Voice assistant and Amazon Bedrock setup](docs/VOICE-ASSISTANT.md)
+- [MCP endpoints and client recipes](docs/MCP.md)
 - [Devpost draft for owner review](docs/DEVPOST-DRAFT.md)
 - [English recording script](docs/DEMO-SCRIPT.md)
 - [Final acceptance and limitations](docs/FINAL-ACCEPTANCE.md)
@@ -127,8 +172,8 @@ npm run build
 - [Remote MCP verification core and remaining OAuth gates](docs/MCP-REMOTE-PLAN.md)
 - [Verification performed during setup](docs/VERIFICATION.md)
 
-Target: the Alexa+ simulated web-experience path in the [Amazon Developer Hackathon](https://amazonappdev2026.devpost.com/rules). This is an independent project, not an official Amazon product or a certified Alexa integration. AWS Builder participation will depend on actual, documented AWS integration.
+Target: the Alexa+ simulated-experience path in the [Amazon Developer Hackathon](https://amazonappdev2026.devpost.com/rules). This is an independent project, not an official Amazon product or a certified Alexa integration. The Amazon Bedrock integration is real code using the AWS SDK; check the AWS Builder bonus rules and run it with your own AWS account before claiming live results.
 
 ## Repository and licensing
 
-The repository starts private. No new open-source license is asserted by this initialization; review ownership and choose an appropriate license before any public/open-source release. Third-party dependencies retain their respective licenses. Never commit service keys, wallet private keys, `.env` files, uploaded identity documents, or production data.
+This repository is public and released under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses. Never commit service keys, AWS or Bedrock credentials, wallet private keys, `.env` files, uploaded identity documents, or production data.
