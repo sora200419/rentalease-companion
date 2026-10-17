@@ -8,6 +8,7 @@
     "test:mcp": "node scripts/test-workflows.mjs --mcp",
     "test:companion:http": "node scripts/smoke-companion.mjs",
     "test:demo:http": "node scripts/test-judge-http.mjs",
+    "check:bedrock": "node scripts/check-bedrock.mjs",
     "model:serve": "node scripts/serve-local-model.mjs",
     "model:evaluate": "node scripts/evaluate-local-model.mjs",
     "dev": "next dev",
