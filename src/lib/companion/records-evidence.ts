@@ -72,7 +72,7 @@ export function answerDeductionQuestion(records:Records,deductionId:string,quest
      return deductionHistoryAnswer(records,deductionId);
    // Condition questions about the selected item ("Was the scuff already there when I
    // moved in?") are answered by quoting both reports, never by inferring a finding.
-   const condition=/\b(sources?|citations?|files?|already|before|pre ?existing|existed|originally|moved? (?:in|out)|first (?:arrived|moved)|condition|scuffs?|scratch(?:es)?|stains?|marks?|residue|dirty|clean(?:ed)?|keys?)\b/;
+   const condition=/\b(sources?|citations?|files?|already|before|pre ?existing|existed|originally|moved? (?:in|out)|first (?:arrived|moved)|condition|scuffs?|scratch(?:es)?|stains?|marks?|residue|dirty|clean(?:ed)?|keys?|damag\w*|broke\w*|break|repair\w*|worn|wear|dent\w*|crack\w*|hole|paint\w*)\b/;
    if(!condition.test(q)) return {...basic,selection:'rules' as const};
  }
  return deductionAnswer(records,deductionId);

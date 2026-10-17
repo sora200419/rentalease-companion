@@ -335,3 +335,17 @@ test('speech never splits amounts and reads them as ringgit', () => {
   assert.equal(normalizeSpokenQuestion('Alexa, ask RentalEase'), '');
   assert.equal(normalizeSpokenQuestion('Hey Alexa, open RentalEase.'), '');
 });
+
+test('damage statements get the item evidence; off-topic questions get concrete suggestions', () => withCase(async (store, id) => {
+  const ask = async question => last(await assistantTurn(store, id, { revision: (await store.read(id)).revision, question }, { settings: null }));
+  assert.match((await ask('my air conditioner has been damaged')).text, /Bedroom wall repainting/);
+  assert.match((await ask('if my room has been damaged')).text, /short scuff was recorded/);
+  const off = await ask('Tell me about the weather');
+  assert.match(off.text, /You can ask, for example/);
+}));
+
+test('a Bedrock failure names the error class in the notice', () => quiet(() => withCase(async (store, id) => {
+  const bad = scripted(Object.assign(new Error('The security token included in the request is invalid.'), { name: 'UnrecognizedClientException' }));
+  const session = await assistantTurn(store, id, { revision: 0, question: 'Show evidence for the first deduction' }, { settings, converse: bad.converse });
+  assert.match(session.notice, /^Amazon Bedrock was unavailable \(UnrecognizedClientException\)/);
+})));

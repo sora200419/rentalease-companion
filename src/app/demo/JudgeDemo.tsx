@@ -116,7 +116,7 @@ export default function JudgeDemo() {
     </section>}
     {session && records && summary && <>
       <VoiceAssistant role={records.role === 'LANDLORD' ? 'LANDLORD' : 'TENANT'} mode={assistant.mode} model={assistant.model}
-        disabled={busy || !!session.pending} pending={!!session.pending} aiDraftPending={session.pending?.origin === 'assistant'} ask={askAssistant} latest={latest} />
+        disabled={busy || !!session.pending} pending={!!session.pending} aiDraftPending={session.pending?.origin === 'assistant'} notice={session.notice} ask={askAssistant} latest={latest} />
       <div className={styles.metrics}><div>Recorded deposit<strong>{money(records.depositSen)}</strong></div><div>Current refund<strong>{money(records.settlement!.recordedRefundSen)}</strong></div><div>Resolved deductions<strong>{summary.resolvedCount} / 3</strong></div></div>
       <p>{summary.title} · {session.scenario.toLowerCase()} evidence · saved record revision {records.revision}. Proposed new amounts do not change the refund until accepted. No money is transferred.</p>
       <p className={styles.notice} role="status">{session.notice}</p>

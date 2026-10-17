@@ -44,12 +44,12 @@ function englishVoice() {
   return voices.find(v => /Google US English|Samantha|Aria|Jenny|Natural/i.test(v.name)) ?? voices.find(v => v.lang === 'en-US') ?? voices[0];
 }
 
-export default function VoiceAssistant({ role, mode, model, disabled, pending, aiDraftPending, ask, latest }: {
-  role: 'TENANT' | 'LANDLORD'; mode: 'bedrock' | 'rules'; model?: string; disabled: boolean; pending: boolean; aiDraftPending: boolean;
+export default function VoiceAssistant({ role, mode, model, disabled, pending, aiDraftPending, notice, ask, latest }: {
+  role: 'TENANT' | 'LANDLORD'; mode: 'bedrock' | 'rules'; model?: string; disabled: boolean; pending: boolean; aiDraftPending: boolean; notice: string;
   ask: (question: string) => Promise<JudgeMessage | null>; latest: JudgeMessage | null;
 }) {
   const [state, setState] = useState<State>('idle');
-  const [heard, setHeard] = useState(''), [hint, setHint] = useState('');
+  const [heard, setHeard] = useState(''), [hint, setHint] = useState(''), [typed, setTyped] = useState('');
   const canListen = useSyncExternalStore(never, hasRecognition, () => false);
   const canSpeak = useSyncExternalStore(never, hasSynthesis, () => false);
   const voiceOn = useSyncExternalStore(subscribePreference, readPreference, () => true);
@@ -163,6 +163,7 @@ export default function VoiceAssistant({ role, mode, model, disabled, pending, a
       <p className={styles.deviceStatus} role="status">{status}</p>
       {heard && <p className={styles.heard}>“{heard}”</p>}
       {hint && <p className={styles.hint} role="alert">{hint}</p>}
+      {/^Amazon Bedrock was unavailable|^COMPANION_BEDROCK_MODEL|^The AI assistant is busy/.test(notice) && <p className={styles.hint}>{notice.split('. ')[0]}.</p>}
       {/* Always mounted so screen readers announce each new answer. */}
       <div className={answer ? styles.answer : undefined} aria-live="polite">{answer && <>
         <p>{answer.provider === 'bedrock' ? stripCitations(answer.text) : answer.speech ?? answer.text.split('\n\n')[0]}</p>
@@ -172,6 +173,13 @@ export default function VoiceAssistant({ role, mode, model, disabled, pending, a
         <small>{answer.provider === 'bedrock' ? `Amazon Bedrock · ${answer.model} · MCP tools: ${answer.tools?.join(' → ') || 'none'}` : 'Rule mode · quoted from the records'}
           {aiDraftPending ? ' · AI draft ready below' : ''}</small>
       </>}</div>
+      {/* The same path as voice: type a question here if you cannot or do not want to speak. */}
+      <form className={styles.typed} onSubmit={e => { e.preventDefault(); const text = typed; setTyped(''); void submit(text); }}>
+        <label htmlFor="voice-typed" className={styles.visuallyHidden}>Type a question for RentalEase</label>
+        <input id="voice-typed" type="text" maxLength={600} value={typed} onChange={e => setTyped(e.target.value)} disabled={disabled || state === 'thinking'}
+          placeholder={pending ? 'Confirm or cancel the preview below first' : 'Or type a question, for example “Who is responsible for the wall?”'} />
+        <button type="submit" disabled={disabled || state === 'thinking' || !typed.trim()}>Ask</button>
+      </form>
       <div className={styles.suggestions} aria-label="Suggested questions">
         {suggestions[role].map(s => <button type="button" key={s} disabled={disabled || state === 'thinking'} onClick={() => void submit(s)}>{s}</button>)}
       </div>

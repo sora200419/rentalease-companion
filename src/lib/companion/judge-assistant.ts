@@ -78,7 +78,7 @@ export async function assistantTurn(store: JudgeStore, id: string, value: unknow
     if (error instanceof Error && /changed in another tab/.test(error.message)) throw error;
     // Log the error class for the developer; the page gets a plain-language notice.
     console.warn('[rentalease] Bedrock assistant unavailable:', error instanceof Error ? error.name + ': ' + error.message : error);
-    return rules('Amazon Bedrock was unavailable, so the rule assistant answered.');
+    return rules('Amazon Bedrock was unavailable (' + (error instanceof Error && error.name !== 'Error' ? error.name : 'see the server log') + '), so the rule assistant answered.');
   } finally {
     running--;
     await client?.close().catch(() => undefined);
