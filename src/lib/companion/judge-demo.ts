@@ -107,7 +107,9 @@ export function applyJudgeCommand(before: JudgeSession, operation: string, value
     const route = routeDialogue(records, session.selected, input.question);
     session.selected = route.deductionId; session.pending = null;
     const answer = route.question && session.selected ? answerDeductionQuestion(records, session.selected, input.question) : null;
-    const text = answer?.text ?? route.notice;
+    const text = answer?.topic === 'unsupported'
+      ? answer.text + ' You can ask, for example: “Was the scuff already there when I moved in?”, “What do the kitchen photos show?” or “What is the refund right now?”.'
+      : answer?.text ?? route.notice;
     const speech = answer?.topic === 'evidence' ? spokenEvidence(records, session.selected) ?? speakable(text) : speakable(text);
     session.messages.push({ role: records.role as DemoRole, question: input.question, text, sourceIds: answer?.sourceIds ?? [], speech, provider: 'rules' });
     session.messages = session.messages.slice(-80);
