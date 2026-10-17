@@ -50,6 +50,7 @@ for (const name of [base, ...alternatives.filter(a => a !== base)])
 
 const request = { messages: [{ role: 'user', content: [{ text: 'Reply with the single word: ready.' }] }], inferenceConfig: { maxTokens: 16 } };
 const working = [];
+const failures = [];
 for (const candidate of candidates) {
   const client = new BedrockRuntimeClient({ region: candidate.region, maxAttempts: 1 });
   const label = candidate.region.padEnd(15) + ' ' + candidate.modelId;
@@ -60,6 +61,7 @@ for (const candidate of candidates) {
     working.push(candidate);
   } catch (error) {
     console.log('FAIL  ' + label + '  → ' + (error?.name ?? 'Error') + ': ' + (error?.message ?? ''));
+    failures.push({ ...candidate, message: error?.message ?? '', requestId: error?.$metadata?.requestId });
   } finally {
     client.destroy();
   }
@@ -67,8 +69,28 @@ for (const candidate of candidates) {
   if (working.length) break;
 }
 
+// The same refusal for every model in every region means the account, not the
+// request, is refused; an id that does not exist only adds "invalid" lines.
+const accountRefusal = f => /Operation not allowed|being verified|tokens per day/i.test(f.message);
+const unknownId = f => /model identifier is invalid/i.test(f.message);
+const accountWide = !working.length && failures.some(accountRefusal) && failures.every(f => accountRefusal(f) || unknownId(f));
+
 console.log('');
-if (!working.length) {
+if (accountWide) {
+  console.log('Every model in every region was refused, so changing the model id or region will not help.');
+  console.log('The API key itself works (a wrong key answers UnrecognizedClientException): the AWS account');
+  console.log('is not yet allowed to run models. Only AWS can lift this:');
+  console.log('  1. Billing console → the account must be on the paid plan, with a verified payment method.');
+  console.log('     Look for an AWS email asking you to verify the account or the card.');
+  console.log('  2. Open an Account and billing support case asking AWS to enable Amazon Bedrock model');
+  console.log('     invocation for this account, and quote these refused requests:');
+  for (const f of [failures.find(f => f.modelId === configuredModel && f.region === configuredRegion), ...failures]
+    .filter((f, i, all) => f && accountRefusal(f) && f.requestId && all.indexOf(f) === i).slice(0, 3))
+    console.log('       ' + f.region + '  ' + f.modelId + '  request id ' + f.requestId);
+  console.log('  3. Keep the current .env.local settings and run this check again after AWS replies.');
+  console.log('Until then the app answers in rule mode, and the page says so.');
+  process.exitCode = 1;
+} else if (!working.length) {
   console.log('No combination worked. The message above is Amazon Bedrock’s own reason; common causes:');
   console.log('  UnrecognizedClientException — the API key is wrong, expired, or belongs to another account.');
   console.log('  AccessDeniedException       — an IAM policy or service control policy denies bedrock:InvokeModel.');
