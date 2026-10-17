@@ -82,3 +82,7 @@
 .page .typed input { flex:1; min-width:0; background:#fffef8; }
 .page .typed button { background:#fffef8; color:#193c30; border-color:#fffef8; }
 .visuallyHidden { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+.letterBox { border:1px solid #a8b69f; padding:16px; margin-top:18px; background:#f7f9f1; }
+.letterBox h3 { margin-top:0; }
+.page .letter { min-height:340px; font-size:13.5px; line-height:1.55; resize:vertical; }

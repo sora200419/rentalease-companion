@@ -53,6 +53,8 @@ Use the action menu. Select **Kitchen cleaning → Dispute this deduction**, pas
 
 “Each deduction is a separate decision. I dispute the cleaning charge and accept the twenty-five ringgit key charge, each with its own preview.”
 
+Optional, about ten seconds if the video has room: select an item and press **Draft a dispute letter**. Scroll the letter so the quoted move-in and move-out reports are visible, then press **Copy letter**. “And if I'd rather write to my landlord myself, it drafts a letter from the same records. It quotes both reports and asks for evidence. It never says who is liable, and nothing is sent from here.”
+
 ## 1:35–2:00 — The landlord, briefly
 
 Switch to **Landlord · Daniel**. Select the wall item: **Withdraw this deduction**, paste the message, **Preview decision → Confirm and save**. Select cleaning: **Propose a revised amount**, paste the message, enter 20.00, **Preview decision → Confirm and save**. Only if rehearsal leaves time, tap the chip “What did the tenant say about the wall?”.
