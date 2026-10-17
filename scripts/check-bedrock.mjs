@@ -7,7 +7,8 @@ import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-r
 for (const file of ['.env.local', '.env']) {
   let contents;
   try { contents = readFileSync(new URL('../' + file, import.meta.url), 'utf8'); } catch { continue; }
-  for (const line of contents.split('\n')) {
+  // Windows line endings and an editor's byte order mark must not hide a variable.
+  for (const line of contents.replace(/^﻿/, '').split(/\r?\n/)) {
     const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
     if (!match || line.trimStart().startsWith('#')) continue;
     const value = match[2].trim().replace(/\s+#.*$/, '').replace(/^(['"])(.*)\1$/s, '$2');
