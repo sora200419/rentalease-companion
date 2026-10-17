@@ -48,6 +48,8 @@ The Bedrock path is tested end to end with the real AWS SDK against a local mock
 
 There is no confirm or payment tool. Recipes for MCP Inspector, Claude Code and Claude Desktop are in [MCP.md](docs/MCP.md).
 
+[`SKILL.md`](SKILL.md) is the Agent Skill that drives those tools: when to read evidence before answering, how to draft a decision a human must confirm, and the boundaries the assistant keeps whatever it is asked.
+
 ## Verification
 
 On 2026-10-08, in a Linux container:
