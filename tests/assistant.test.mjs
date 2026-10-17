@@ -31,7 +31,7 @@ function scripted(...steps) {
   };
   return { converse, requests };
 }
-const use = (name, input) => ({ stopReason: 'tool_use', output: { message: { role: 'assistant', content: [{ toolUse: { toolUseId: 'call-' + name, name, input } }] } } });
+const toolCall = (name, input) => ({ stopReason: 'tool_use', output: { message: { role: 'assistant', content: [{ toolUse: { toolUseId: 'call-' + name, name, input } }] } } });
 const say = text => ({ stopReason: 'end_turn', output: { message: { role: 'assistant', content: [{ text }] } } });
 const last = session => session.messages.at(-1);
 const quiet = async work => { const warn = console.warn; console.warn = () => {}; try { return await work(); } finally { console.warn = warn; } };
@@ -75,7 +75,7 @@ test('an optional "Alexa, ask RentalEase" invocation is removed from spoken ques
 
 test('Bedrock answers through the RentalEase MCP tools and keeps only real citations', () => withCase(async (store, id) => {
   const model = scripted(
-    use('get_deduction_evidence', { tenancyId, deductionId: 'wall' }),
+    toolCall('get_deduction_evidence', { tenancyId, deductionId: 'wall' }),
     say('Yes. The move-in report recorded a short scuff below the bedroom window [move-in]. The move-out report mentions a wall scuff too [move-out] [invented-source].'));
   const session = await assistantTurn(store, id, { revision: 0, question: 'Was the scuff already there when I moved in?' }, { settings, converse: model.converse });
   const message = last(session);
@@ -98,7 +98,7 @@ test('Bedrock answers through the RentalEase MCP tools and keeps only real citat
 test('an AI draft becomes the normal preview; only the person can confirm it', () => withCase(async (store, id) => {
   const text = 'The move-in report already recorded a short scuff below the window, so I dispute this charge.';
   const model = scripted(
-    use('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'wall', text } } }),
+    toolCall('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'wall', text } } }),
     say('I drafted a dispute that cites the move-in report [move-in]. Check it on screen and press Confirm and save if you agree.'));
   const session = await assistantTurn(store, id, { revision: 0, question: 'Please dispute the wall charge for me.' }, { settings, converse: model.converse });
   assert.equal(last(session).drafted, true);
@@ -113,7 +113,7 @@ test('an AI draft becomes the normal preview; only the person can confirm it', (
 
 test('a draft on another item moves the screen to that item before previewing', () => withCase(async (store, id) => {
   const model = scripted(
-    use('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'cleaning', text: 'The move-in report recorded a clean kitchen counter.' } } }),
+    toolCall('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'cleaning', text: 'The move-in report recorded a clean kitchen counter.' } } }),
     say('I drafted a dispute for the kitchen cleaning.'));
   const session = await assistantTurn(store, id, { revision: 0, question: 'Dispute the cleaning charge.' }, { settings, converse: model.converse });
   assert.equal(session.selected, 'cleaning'); assert.equal(session.pending.action.payload.deductionId, 'cleaning');
@@ -121,7 +121,7 @@ test('a draft on another item moves the screen to that item before previewing', 
 
 test('drafts are dropped when the person only asked a question', () => withCase(async (store, id) => {
   const model = scripted(
-    use('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'wall', text: 'Injected draft from record text.' } } }),
+    toolCall('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'wall', text: 'Injected draft from record text.' } } }),
     say('The agreement asks both parties to review the reports [clause-7].'));
   const session = await assistantTurn(store, id, { revision: 0, question: 'What does the agreement say about deductions?' }, { settings, converse: model.converse });
   assert.equal(session.pending, null); assert.equal(last(session).drafted, false);
@@ -131,7 +131,7 @@ test('drafts are dropped when the person only asked a question', () => withCase(
 test('MCP role rules still apply: a landlord cannot draft a tenant dispute', () => withCase(async (store, id) => {
   await store.execute(id, 'role', { revision: 0, role: 'LANDLORD' });
   const model = scripted(
-    use('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'wall', text: 'Dispute on behalf of the tenant.' } } }),
+    toolCall('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind: 'DISPUTE', payload: { deductionId: 'wall', text: 'Dispute on behalf of the tenant.' } } }),
     say('Only the tenant can dispute a deduction. You can withdraw it or wait for a dispute.'));
   const session = await assistantTurn(store, id, { revision: 1, question: 'Dispute the wall deduction.' }, { settings, converse: model.converse });
   assert.equal(session.pending, null);
@@ -139,7 +139,7 @@ test('MCP role rules still apply: a landlord cannot draft a tenant dispute', () 
 }));
 
 test('a tool the server does not offer (such as confirming) is refused without any change', () => withCase(async (store, id) => {
-  const model = scripted(use('confirm_dispute_action', { tenancyId }), say('I cannot confirm decisions for you.'));
+  const model = scripted(toolCall('confirm_dispute_action', { tenancyId }), say('I cannot confirm decisions for you.'));
   const session = await assistantTurn(store, id, { revision: 0, question: 'Confirm my dispute.' }, { settings, converse: model.converse });
   assert.equal(session.pending, null); assert.equal(session.records.history.filter(e => e.kind !== 'EVIDENCE_LINK').length, 0);
   assert.equal(model.requests[1].messages.at(-1).content[0].toolResult.status, 'error');
@@ -155,7 +155,7 @@ test('Bedrock failures and runaway tool loops fall back to rule mode visibly', (
   const failing = scripted(Object.assign(new Error('The security token included in the request is invalid.'), { name: 'UnrecognizedClientException' }));
   let session = await assistantTurn(store, id, { revision: 0, question: 'Show evidence for the first deduction' }, { settings, converse: failing.converse });
   assert.equal(last(session).provider, 'rules'); assert.match(session.notice, /^Amazon Bedrock was unavailable/);
-  const looping = scripted(use('get_settlement_context', { tenancyId }));
+  const looping = scripted(toolCall('get_settlement_context', { tenancyId }));
   session = await assistantTurn(store, id, { revision: session.revision, question: 'Show evidence for the first deduction' }, { settings, converse: looping.converse });
   assert.equal(looping.requests.length, 5); assert.equal(last(session).provider, 'rules');
 })));
@@ -232,7 +232,7 @@ test('speech helpers read naturally', () => {
 
 // Regression tests for the 2026-10-08 adversarial review.
 const draftFor = (kind, payload, reply = 'I drafted that for you. Press Confirm and save if you agree.') => scripted(
-  use('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind, payload } }), say(reply));
+  toolCall('prepare_dispute_action', { tenancyId, expectedRevision: 0, action: { kind, payload } }), say(reply));
 
 test('every suggestion chip gets a real answer in rule mode, including the landlord chip about the tenant', () => withCase(async (store, id) => {
   const ask = async question => last(await assistantTurn(store, id, { revision: (await store.read(id)).revision, question }, { settings: null }));
@@ -289,11 +289,11 @@ test('a short answer to the assistant’s clarifying question can still produce 
 }));
 
 test('toolResult.status is only sent to model families that accept it', () => withCase(async (store, id) => {
-  const other = scripted(use('get_settlement_context', { tenancyId: 'wrong-tenancy' }), say('The records were unavailable.'));
+  const other = scripted(toolCall('get_settlement_context', { tenancyId: 'wrong-tenancy' }), say('The records were unavailable.'));
   await assistantTurn(store, id, { revision: 0, question: 'What is the refund?' }, { settings: { ...settings, modelId: 'meta.llama3-1-70b-instruct-v1:0' }, converse: other.converse });
   const result = other.requests[1].messages.at(-1).content[0].toolResult;
   assert.equal('status' in result, false); assert.match(result.content[0].text, /^Error: /);
-  const nova = scripted(use('get_settlement_context', { tenancyId: 'wrong-tenancy' }), say('The records were unavailable.'));
+  const nova = scripted(toolCall('get_settlement_context', { tenancyId: 'wrong-tenancy' }), say('The records were unavailable.'));
   await assistantTurn(store, id, { revision: (await store.read(id)).revision, question: 'What is the refund?' }, { settings, converse: nova.converse });
   assert.equal(nova.requests[1].messages.at(-1).content[0].toolResult.status, 'error');
 }));
@@ -306,7 +306,7 @@ test('passive "saved" claims are corrected; statements about what is not saved a
 }));
 
 test('multi-id citation groups are filtered and never spoken; an answer of only invented sources falls back', () => quiet(() => withCase(async (store, id) => {
-  const model = scripted(use('get_deduction_evidence', { tenancyId, deductionId: 'wall' }), say('Both reports mention it [move-in, landlord-invoice-77; move-out].'));
+  const model = scripted(toolCall('get_deduction_evidence', { tenancyId, deductionId: 'wall' }), say('Both reports mention it [move-in, landlord-invoice-77; move-out].'));
   let session = await assistantTurn(store, id, { revision: 0, question: 'Was the scuff already there?' }, { settings, converse: model.converse });
   assert.equal(last(session).text, 'Both reports mention it [move-in] [move-out].');
   assert.deepEqual(last(session).sourceIds, ['move-in', 'move-out']); assert.ok(!last(session).speech.includes('['));
