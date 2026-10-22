@@ -11,7 +11,7 @@ const { bedrockSettings } = await get('bedrock');
 const { normalizeSpokenQuestion, speakable, spokenMoney } = await get('voice');
 const { modelToolSchema, draftMatchesRequest } = await get('assistant');
 const { answerDeductionQuestion } = await get('records-evidence');
-const { speechParts } = await get('voice');
+const { speechParts, disputeLetter } = await get('voice');
 
 const settings = { modelId: 'amazon.nova-pro-v1:0', region: 'us-east-1' };
 const tenancyId = 'judge-synthetic-tenancy';
@@ -349,3 +349,36 @@ test('a Bedrock failure names the error class in the notice', () => quiet(() => 
   const session = await assistantTurn(store, id, { revision: 0, question: 'Show evidence for the first deduction' }, { settings, converse: bad.converse });
   assert.match(session.notice, /^Amazon Bedrock was unavailable \(UnrecognizedClientException\)/);
 })));
+
+test('the dispute letter quotes the recorded reports and states a request, not a finding', () => withCase(async (store, id) => {
+  const { records } = await store.read(id);
+  const letter = disputeLetter(records, 'wall', new Date('2026-10-18T00:00:00Z'));
+  assert.match(letter, /^18 October 2026\n/);
+  assert.match(letter, /Re: Dispute of deposit deduction — Bedroom wall repainting \(MYR 100\.00\)/);
+  assert.match(letter, /security deposit of MYR 1800\.00/);
+  assert.match(letter, /The move-in report \(accepted, 1 October 2025\) records: “A short scuff was recorded below the bedroom window/);
+  assert.match(letter, /The move-out report \(submitted, 20 September 2026\) records: “Landlord reports a wall scuff/);
+  assert.match(letter, /The agreement \(clause-7\) states: “Review proposed deductions/);
+  assert.ok(!letter.includes('SYNTHETIC'), 'screen labels are not part of a letter');
+  assert.match(letter, /\[Landlord name\]/);
+  assert.match(letter, /\[Your name\]/);
+  assert.match(letter, /either withdraw this deduction or send me the evidence/);
+  assert.ok(!/\b(you are liable|you must pay|illegal|unlawful|sue)\b/i.test(letter), 'a request, never a liability claim');
+}));
+
+test('the dispute letter is tenant-only and refuses unavailable items', () => withCase(async (store, id) => {
+  const { records } = await store.read(id);
+  assert.equal(disputeLetter({ ...records, role: 'LANDLORD' }, 'wall'), null);
+  assert.equal(disputeLetter(records, 'no-such-item'), null);
+  const withdrawn = structuredClone(records);
+  withdrawn.settlement.deductions.find(d => d.id === 'wall').status = 'WITHDRAWN';
+  assert.equal(disputeLetter(withdrawn, 'wall'), null);
+}));
+
+test('without a move-in report the letter says the baseline is missing instead of inventing one', () => withCase(async store => {
+  const { id } = await store.create('MISSING');
+  const { records } = await store.read(id);
+  const letter = disputeLetter(records, 'wall');
+  assert.match(letter, /No move-in report is on record, so the condition of the property at the start of the tenancy has not been established/);
+  assert.ok(!/The move-in report \(/.test(letter));
+}));

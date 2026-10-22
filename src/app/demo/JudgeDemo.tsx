@@ -7,7 +7,7 @@ import { labels, optionsFor, routeDialogue } from '@/lib/companion/records-dialo
 import { money, parseMoney } from '@/lib/companion/records-workflow';
 import { settlementSummary } from '@/lib/companion/records-summary';
 import { evidenceNotices } from '@/lib/companion/records-evidence-notices';
-import { disputeTemplate, normalizeSpokenQuestion } from '@/lib/companion/voice';
+import { disputeLetter, disputeTemplate, normalizeSpokenQuestion } from '@/lib/companion/voice';
 import VoiceAssistant from './VoiceAssistant';
 import McpConnect from './McpConnect';
 import styles from './demo.module.css';
@@ -31,6 +31,7 @@ export default function JudgeDemo() {
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [question, setQuestion] = useState(''), [kind, setKind] = useState<ActionKind | ''>('');
   const [text, setText] = useState(''), [amount, setAmount] = useState('');
+  const [letter, setLetter] = useState<string | null>(null), [letterStatus, setLetterStatus] = useState('');
   const [scenario, setScenario] = useState<Scenario>('STANDARD'), [newScenario, setNewScenario] = useState(false);
   const initialRequest = useRef<Promise<Snapshot> | null>(null);
   useEffect(() => {
@@ -47,7 +48,17 @@ export default function JudgeDemo() {
     })();
     return () => { active = false; };
   }, []);
-  function clearDraft() { setKind(''); setText(''); setAmount(''); }
+  function clearDraft() { setKind(''); setText(''); setAmount(''); setLetter(null); setLetterStatus(''); }
+  async function copyLetter() {
+    try { await navigator.clipboard.writeText(letter ?? ''); setLetterStatus('Copied to the clipboard.'); }
+    catch { setLetterStatus('Your browser blocked copying. Select the letter text and copy it yourself.'); }
+  }
+  function downloadLetter(name: string) {
+    const url = URL.createObjectURL(new Blob([letter ?? ''], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'dispute-letter-' + (name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'deduction') + '.txt';
+    link.click(); URL.revokeObjectURL(url); setLetterStatus('Downloaded.');
+  }
   async function command(operation: string, input: Record<string, unknown> = {}) {
     if (busy || (!session && operation !== 'start')) return null;
     setBusy(true); setError('');
@@ -60,6 +71,7 @@ export default function JudgeDemo() {
   const records = session?.records, selected = records?.settlement?.deductions.find(d => d.id === session?.selected);
   const options = records ? optionsFor(records, session!.selected).filter(o => o.kind !== 'REPORT') : [];
   const summary = records ? settlementSummary(records) : null;
+  const canLetter = !!(records && selected && disputeLetter(records, selected.id));
   const selection = options.find(o => o.kind === kind);
   function choose(value: ActionKind | '') { setKind(value); setText(value ? fixed[value] ?? '' : ''); setAmount(''); }
   async function prepare() {
@@ -151,6 +163,15 @@ export default function JudgeDemo() {
             {kind === 'ADJUSTMENT' && <><label htmlFor="amount">New proposed amount (MYR)</label><input id="amount" inputMode="decimal" value={amount} disabled={busy || !!session.pending} onChange={e => setAmount(e.target.value)} placeholder="20.00" /></>}
             <button type="submit" disabled={busy || !!session.pending || text.trim().length < 10}>Preview decision</button></>}
           </form>
+          {canLetter && selected && <section className={styles.letterBox} aria-label="Dispute letter"><h3>Or write to the landlord yourself</h3>
+            <p>Draft a formal letter from the recorded reports for “{selected.reason}”. Nothing is saved or sent from RentalEase: you copy or download it and send it yourself.</p>
+            {letter === null
+              ? <button type="button" disabled={busy} onClick={() => { setLetter(disputeLetter(records!, selected.id)); setLetterStatus(''); }}>Draft a dispute letter</button>
+              : <><label htmlFor="letter">Dispute letter. Replace the [bracketed] parts before sending.</label>
+                <textarea id="letter" className={styles.letter} value={letter} maxLength={6000} onChange={e => { setLetter(e.target.value); setLetterStatus(''); }} />
+                <div className={styles.actions}><button type="button" onClick={() => void copyLetter()}>Copy letter</button><button type="button" onClick={() => downloadLetter(selected.reason)}>Download as text</button><button type="button" onClick={() => { setLetter(null); setLetterStatus(''); }}>Close letter</button></div>
+                <p role="status">{letterStatus}</p></>}
+          </section>}
           {session.pending && <section className={styles.preview} aria-label="Decision preview"><h3>Check before saving</h3>
             {session.pending.origin === 'assistant' && <p className={styles.aiDraft}>Drafted by Amazon Bedrock from the quoted records. Read it carefully: you decide whether to save it.</p>}<p>{session.pending.role} · {session.pending.description}</p><p className={styles.pre}>{session.pending.action.payload.text}</p><p>Valid for five minutes. Confirming records this exact decision locally. Cancelling or refreshing discards the preview.</p>
             <div className={styles.actions}><button className={styles.primary} disabled={busy} onClick={async () => { if (await command('confirm', { id: session.pending!.id })) clearDraft(); }}>Confirm and save</button><button disabled={busy} onClick={async () => { if (await command('cancel')) clearDraft(); }}>Cancel preview</button></div></section>}

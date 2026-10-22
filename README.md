@@ -21,8 +21,9 @@ Then try:
 
 1. **Voice.** In Chrome or Edge, tap the light ring and ask *"Was the scuff already there when I moved in?"* (an optional *"Alexa, ask RentalEase…"* prefix works too). Without a microphone, tap a suggestion chip. The answer quotes both reports, shows source chips and is read aloud.
 2. **A drafted decision.** Say or tap *"Dispute the wall charge for me"*. The draft appears as a **Check before saving** preview, or as a pre-filled form in rule mode. Press **Confirm and save** yourself.
-3. **Both sides.** Switch to **Landlord · Daniel** to reply, propose a new amount or withdraw. Resolve all three deductions; the intended outcome is a MYR 1,755 recorded refund. No money is transferred.
-4. **MCP.** Open **Connect an MCP client to this case** at the bottom of the page and run the MCP Inspector command it shows.
+3. **A letter you can send.** As the tenant, select an item and press **Draft a dispute letter**. It writes a formal letter that quotes the move-in and move-out reports, the amounts and the agreement clause, and asks the landlord to withdraw the charge or show evidence. Fill in the [bracketed] names, then copy it or download it as text. Nothing is saved or sent from RentalEase, and the letter makes no claim about who is liable.
+4. **Both sides.** Switch to **Landlord · Daniel** to reply, propose a new amount or withdraw. Resolve all three deductions; the intended outcome is a MYR 1,755 recorded refund. No money is transferred.
+5. **MCP.** Open **Connect an MCP client to this case** at the bottom of the page and run the MCP Inspector command it shows.
 
 Everything runs without Supabase, AWS or model credentials. It uses synthetic people, records and four visibly labelled AI-generated photos, with standard, missing-baseline and conflicting-account scenarios. New scenarios keep old local histories.
 
@@ -47,6 +48,8 @@ The Bedrock path is tested end to end with the real AWS SDK against a local mock
 - six read-only tools: tenancy list, settlement context, deduction evidence, agreement, questions, and draft checking.
 
 There is no confirm or payment tool. Recipes for MCP Inspector, Claude Code and Claude Desktop are in [MCP.md](docs/MCP.md).
+
+[`SKILL.md`](SKILL.md) is the Agent Skill that drives those tools: when to read evidence before answering, how to draft a decision a human must confirm, and the boundaries the assistant keeps whatever it is asked.
 
 ## Verification
 

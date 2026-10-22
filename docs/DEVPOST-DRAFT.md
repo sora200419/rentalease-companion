@@ -83,18 +83,161 @@ Ollama was an earlier local experiment in the records workspace; mention it in t
 - Repository: https://github.com/sora200419/rentalease-companion. Public, released under the MIT License ([LICENSE](../LICENSE), copyright sora200419). Recheck the rules' source-access requirements before submission.
 - A real video URL after recording/upload, following the [demo script](DEMO-SCRIPT.md). Do not enter a placeholder or localhost as a public demo.
 - Cover/gallery screenshots that visibly label the simulation and synthetic evidence. `docs/images/voice-rule-mode.png` shows rule mode; take Bedrock-mode screenshots only from a live run, not from the mock.
-- Reviewed developer feedback. [FRICTION_LOG.md](FRICTION_LOG.md) holds the earlier local-model observations. Check that it also covers the 2026-10-07/08 observations below, and add your own from the live Bedrock run.
+- Reviewed developer feedback. The section below is written in the five-part form the organizers ask for; [FRICTION_LOG.md](FRICTION_LOG.md) holds the dated observations behind it, including the live Bedrock account findings from 2026-10-17. Read both and add anything you observed yourself before submitting.
 
 ## Developer feedback (draft)
 
-Observed during development on 2026-10-07/08. None of it comes from a live Bedrock call.
+Each tool below answers the five questions the organizers ask: what it was used
+for, what worked, what needs work, how onboarding felt, and whether we would
+build with it again. Observations are dated; the Bedrock account findings come
+from a live account on 2026-10-17, the rest from development on 2026-10-07/08.
 
-- **npm lockfile across platforms:** a lockfile generated on Windows silently dropped other platforms' native optional binaries (npm/cli#4828), breaking `npm ci` on Linux (macOS is expected to fail the same way but was not tested). It was caught only by installing on Linux.
-- **AWS SDK for JavaScript v3 (`@aws-sdk/client-bedrock-runtime` 3.1147.0):** Converse goes over HTTP/2 by default. Against an HTTP/1.1 local mock it failed with only `Error: Protocol error` (`ERR_HTTP2_ERROR`). A clearer error or a documented note would help.
-- **MCP tools and Amazon Nova:** MCP SDK schemas (draft-07 with `$schema`, `additionalProperties: false`, nested `oneOf`) do not match the subset Nova documents for Converse tools, so an adapter flattens them. A recommended MCP-to-Converse schema mapping would help.
-- **Regions and inference profiles:** from Malaysia/Singapore, Nova models are called through `apac.` or `global.` inference-profile IDs, and Nova 2 Lite only through the global profile. Region and profile availability was hard to determine.
-- **Positive:** a Bedrock API key in `AWS_BEARER_TOKEN_BEDROCK` is picked up by the SDK automatically.
-- **MCP Inspector 2.9.0 CLI:** without an Authorization header it attempts interactive OAuth and fails with "Interactive OAuth requires a TTY" instead of reporting a plain 401.
-- **Web Speech API:** Chromium now exposes unprefixed `SpeechRecognition`, so feature detection and test mocks must cover both it and `webkitSpeechRecognition`.
+### Amazon Bedrock (Converse API, Amazon Nova)
 
-Distinguish inherited work, new additions and future plans in the final submission. Before selecting the AWS Builder bonus (mini-challenge), check its rules: [DEVELOPMENT-SERVICES.md](DEVELOPMENT-SERVICES.md) records that it requires actual documented AWS usage, and so far Bedrock has only been exercised against a local mock. Do not select it on the strength of the mock tests, or because Supabase infrastructure may run on AWS.
+**Used for:** the optional AI assistant. The model answers a tenant's deposit
+question by calling the project's own MCP tools and quoting the records it
+reads back. Rule mode answers when Bedrock is unavailable.
+
+**Worked well:** the Converse API's tool-use loop maps cleanly onto MCP tools —
+one adapter, no bespoke protocol work. A Bedrock API key in
+`AWS_BEARER_TOKEN_BEDROCK` is picked up by the SDK with no credential code at
+all, which is the single nicest thing about this integration.
+
+**Needs work — error messages do not name the account as the cause.** On a new
+account with redeemed hackathon credits, every Bedrock call was refused. We
+tried 28 model-and-region combinations (Nova Pro, Nova Lite, Nova Micro, Nova 2
+Lite × `apac.` / `us.` / `global.` profiles × six regions). The same underlying
+cause produced three different errors:
+
+- `ValidationException: Operation not allowed` — the majority
+- `AccessDeniedException: Your account is currently being verified` — two regions
+- `ThrottlingException: Too many tokens per day` — three regions
+
+Only the middle one names the real problem, and it appeared in a minority of
+calls. `ValidationException` is the wrong class for an account-state problem:
+it says the *request* is invalid, which sends a developer to debug model IDs,
+regions and inference profiles. That is exactly the wrong direction, and it is
+where our time went. `ThrottlingException` on an account that had never made a
+successful call is misleading in the same way.
+
+Three things compounded it. The Model access console page has been retired
+("models are automatically enabled when first invoked"), removing the one page
+a developer would check to rule access out. Redeemed credits ($250, active)
+suggest the account is ready, but credits are billing, not entitlement.
+Upgrading from the Free Plan to a paid plan did not change the result, because
+account verification is a separate gate that nothing in the Bedrock console
+surfaces. A developer on a hackathon deadline can lose a day here.
+
+**Suggested fix:** return one error that names the account state —
+`AccessDeniedException: account verification pending` — consistently across
+regions and models, and show pending verification as a banner in the Bedrock
+console.
+
+**Onboarding (zero to hello world):** not reached. Getting a key and writing the
+call took under an hour; the account gate is still unresolved a day later. We
+built `npm run check:bedrock`, which sends one minimal Converse request per
+model/region pair and prints Bedrock's own message for each, because no single
+error told us anything. That script should not need to exist.
+
+**Would we build with it again:** yes for the API, with reservations about
+account onboarding. The Converse tool-use design is good and the SDK is
+pleasant. We would not plan a time-boxed project around first-time Bedrock
+access again without verifying the account days in advance.
+
+### AWS SDK for JavaScript v3 (`@aws-sdk/client-bedrock-runtime` 3.1147.0)
+
+**Used for:** every Bedrock call, and against a local mock Converse server
+before an AWS account existed.
+
+**Worked well:** automatic bearer-token authentication (above). Lazy-loading the
+client keeps rule mode free of any AWS dependency at runtime.
+
+**Needs work:** Converse uses HTTP/2 by default. Against an HTTP/1.1 local mock
+it fails with only `Error: Protocol error` (`ERR_HTTP2_ERROR`) — no mention of
+HTTP/2. We found it from a stack trace and rewrote the mock over HTTP/2. A
+clearer message, or a documented note for custom endpoints, would have saved an
+evening.
+
+**Onboarding:** quick. Installing the client and sending a Converse request took
+minutes.
+
+**Would we build with it again:** yes, without reservation.
+
+### Model Context Protocol (TypeScript SDK 1.30.1) — the Alexa+ track tool
+
+**Used for:** the server at the centre of this project. Six tools over
+Streamable HTTP (protocol `2025-11-25`) expose tenancy records, deduction
+evidence, the agreement, a question endpoint and draft validation. The same
+server answers the web app, the Bedrock assistant and any external MCP client.
+
+**Worked well:** one server, three consumers, no duplicated logic. Because the
+model can only reach the case through these tools, the safety boundary is
+structural rather than a matter of prompt discipline — there is no confirm or
+payment tool to call, so no prompt can make the assistant save a decision.
+
+**Needs work:** MCP tool schemas and Amazon Nova's Converse tool schemas do not
+agree. The SDK emits draft-07 with `$schema`, `additionalProperties: false` and
+nested `oneOf` from a discriminated union; Nova documents a narrow subset
+(top-level `type`, `properties`, `required`). We wrote an adapter that flattens
+schemas for the model while the MCP server keeps validating the exact schema. A
+documented MCP-to-Converse mapping would make this a non-issue.
+
+**Onboarding:** good. The SDK's server API was understandable without reading
+the protocol specification first.
+
+**Would we build with it again:** yes. This is the part of the architecture we
+would keep unchanged.
+
+### MCP Inspector CLI 2.9.0
+
+**Used for:** verifying the endpoint from outside our own code — listing tools
+and calling `ask_records` against the running demo.
+
+**Worked well:** it found and exercised all six tools immediately, which is the
+proof we wanted that the server is a real MCP server and not a private API.
+
+**Needs work:** without an `Authorization` header it attempts interactive OAuth
+and fails with `Interactive OAuth requires a TTY`, hiding the plain 401 and the
+`WWW-Authenticate: Bearer` header the server returned. In CLI mode it should
+report the 401 as-is.
+
+**Onboarding:** fast once we knew to pass `--header "Authorization: Bearer …"`.
+
+**Would we build with it again:** yes.
+
+### Web Speech API (browser)
+
+**Used for:** the Alexa+-style simulated voice experience — speech recognition
+for questions, speech synthesis for answers, all in the browser.
+
+**Worked well:** no cloud dependency and no audio ever leaves the page, which
+matters for a product about someone's tenancy dispute.
+
+**Needs work:** Chromium now exposes unprefixed `SpeechRecognition` alongside
+`webkitSpeechRecognition`, so feature detection and test mocks must cover both
+names — a mock of only the prefixed name is silently bypassed. Chrome also ends
+long utterances early, so answers must be split per sentence, and `onend` does
+not fire on every platform.
+
+**Onboarding:** easy to start, fiddly to make reliable.
+
+**Would we build with it again:** yes for a simulation; a real product would
+want a managed speech service.
+
+### npm (lockfiles across platforms)
+
+**Used for:** dependency installation; the repository must install cleanly for
+judges on any OS.
+
+**Needs work:** a lockfile generated on Windows silently dropped other
+platforms' native optional binaries (npm/cli#4828), so `npm ci` succeeded on
+Windows and failed on Linux with `Cannot find module
+'../lightningcss.linux-x64-gnu.node'`. We added the 73 missing platform entries
+and a regression test. npm should keep other platforms' optional entries, or
+warn when regenerating a lockfile drops them.
+
+**Onboarding:** not applicable.
+
+**Would we build with it again:** yes, with a cross-platform install check in CI.
+
+Distinguish inherited work, new additions and future plans in the final submission. Before selecting the AWS Builder bonus (mini-challenge), check its rules: [DEVELOPMENT-SERVICES.md](DEVELOPMENT-SERVICES.md) records that it requires actual documented AWS usage. As of 2026-10-17 Bedrock has been called with real credentials against a real account, but every call was refused while account verification is pending, so no model has answered. Do not select the bonus on the strength of the mock tests, the refused live attempts, or because Supabase infrastructure may run on AWS. Select it only if a live Bedrock answer is working before you submit.
