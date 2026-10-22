@@ -1,5 +1,7 @@
 # Devpost submission draft — owner review required
 
+> **Superseded for the form itself (2026-10-23):** copy the submitted answers from [DEVPOST-FORM-ANSWERS.md](DEVPOST-FORM-ANSWERS.md), which match the rule-mode video. This draft is kept as working history and per-tool feedback notes.
+
 Updated 2026-10-08 for the voice assistant, the optional Amazon Bedrock path and the demo MCP endpoint (previous update: 2026-10-02, independent three-item demo). This is a draft, not a submitted entry. Recheck the [official rules](https://amazonappdev2026.devpost.com/rules) before submission. The submission path was verified on 2026-09-28 as allowing an Alexa+ simulated web experience; formal runtime access is not claimed.
 
 ## Project name
