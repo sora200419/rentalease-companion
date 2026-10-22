@@ -38,7 +38,7 @@ try {
   else {
     const mcpFiles = ['tests/mcp.test.mjs', 'tests/mcp-hardening.test.mjs', 'tests/mcp-remote.test.mjs', 'tests/judge-mcp.test.mjs'];
     const files = process.argv.includes('--mcp') ? mcpFiles : ['tests/workflows.test.mjs', 'tests/companion.test.mjs', 'tests/companion-server.test.mjs', 'tests/records-questions.test.mjs', 'tests/records-actions.test.mjs', 'tests/private-evidence.test.mjs', 'tests/records-resolution.test.mjs', 'tests/records-summary.test.mjs', 'tests/records-dialogue-safety.test.mjs', ...mcpFiles];
-    if (!process.argv.includes('--mcp')) files.push('tests/judge-demo.test.mjs', 'tests/assistant.test.mjs', 'tests/lockfile-platforms.test.mjs');
+    if (!process.argv.includes('--mcp')) files.push('tests/judge-demo.test.mjs', 'tests/assistant.test.mjs', 'tests/lockfile-platforms.test.mjs', 'tests/bedrock-diagnosis.test.mjs');
     const tests = spawnSync(process.execPath, ['--test', ...files], {
       stdio: 'inherit',
       env: { ...process.env, RENTALEASE_TEST_OUTPUT: output, NODE_PATH: resolve('node_modules') },

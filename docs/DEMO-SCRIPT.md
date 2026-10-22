@@ -1,6 +1,10 @@
 # English demonstration script
 
-Updated 2026-10-08. Target: 2 minutes 45 seconds; keep the final cut under 3 minutes. This is a recording plan, not an existing video. Rehearse timing and show actual UI behavior. It replaces the 2026-10-02 plan, which opened on the guide page and used only the action menu.
+Updated 2026-10-08. Target: 2 minutes 45 seconds; keep the final cut under 3 minutes. This is the recording plan; the video submitted on 2026-10-23 is described in the next section. Rehearse timing and show actual UI behavior. It replaces the 2026-10-02 plan, which opened on the guide page and used only the action menu.
+
+## What the submitted video shows (recorded 2026-10-23)
+
+The submitted take follows the rule-mode version below, with two further differences. The AWS account refused every live Bedrock call (see [FRICTION_LOG.md](FRICTION_LOG.md)), so there is no Bedrock segment. Browser speech recognition often misheard the product name, so both questions were typed into the card's question box, and the first narration says so instead of "my browser heard me". The video opens with a three-second title card (simulated Alexa+ experience, rule mode, synthetic data), has burned-in English subtitles, and blurs the MCP bearer token.
 
 ## Before recording
 

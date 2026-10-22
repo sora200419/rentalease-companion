@@ -37,7 +37,7 @@ Set `COMPANION_BEDROCK_MODEL` (for example `apac.amazon.nova-pro-v1:0` in Malays
 
 It never decides liability or saves anything. An amount in a draft (for example a landlord's revised offer) changes nothing until a person confirms it, and a revised amount still needs the tenant's acceptance. Any Bedrock failure falls back visibly to the rule assistant. See [voice assistant and Bedrock setup](docs/VOICE-ASSISTANT.md).
 
-The Bedrock path is tested end to end with the real AWS SDK against a local mock Converse server (`scripts/mock-bedrock.mjs`). A live AWS call was not made in the development environment.
+The Bedrock path is tested end to end with the real AWS SDK against a local mock Converse server (`scripts/mock-bedrock.mjs`). On 2026-10-17 and again on 2026-10-23 the owner's AWS account refused every live invocation (details in [FRICTION_LOG.md](docs/FRICTION_LOG.md)). On 2026-10-23 every Nova model in every region tried returned `ValidationException: Operation not allowed`, which points at an account-level restriction rather than the code. `npm run check:bedrock` tries the likely model and region combinations and names that cause. The submitted demo video was therefore recorded in rule mode, and no live Bedrock result is claimed.
 
 ## MCP server
 
@@ -61,7 +61,7 @@ On 2026-10-08, in a Linux container:
 - The official MCP Inspector CLI listed and called the tools against the live endpoint.
 - A headless-browser walkthrough with mocked speech APIs passed in both modes.
 
-**Not verified:** a live Amazon Bedrock call, real microphone hardware, Safari/Firefox, and a macOS clean clone.
+**Not verified:** a successful live Amazon Bedrock call (attempted on 2026-10-17 and 2026-10-23, refused by the AWS account both times), Safari/Firefox, and a macOS clean clone. A real microphone in Chrome on Windows reached the voice card on 2026-10-23, but recognition often misheard "RentalEase" and "scuff", so the demo video uses the card's typed question box.
 
 The earlier submission candidate's browser, responsive and clean-install acceptance is recorded in [acceptance scope](docs/FINAL-ACCEPTANCE.md) and [GitHub delivery verification](docs/GITHUB-DELIVERY.md). That page also explains the cross-platform lockfile fix.
 
