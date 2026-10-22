@@ -24,19 +24,15 @@ Browser workflow used keyboard activation, selection and text entry. It is not a
 - Snapshot script: `scripts/prepare-clean-demo.mjs`.
 - Candidate: 378 files from the current local working tree, including untracked candidate code, excluding `.env*`, Git metadata, dependencies, generated builds and runtime/private data.
 - Manifest SHA-256: `d3714d00756b389e9f6c67cc7de0d157ef529ea19e29ba208799d3c6d42f49b2`.
-- Tested directory: `C:/Users/ONG/AppData/Local/Temp/rentalease-clean-st3mCg`.
+- Tested directory: a temporary folder outside the working copy.
 - Node.js 22.15.0 on Windows. The install used the system CA trust option and an npm cache, not disabled TLS verification. It still installed dependencies into an empty candidate tree.
 - An initial deeply nested candidate failed with Windows path-length errors; the external short-path copy built successfully. Neither copy nor previous histories was deleted.
 - The clean server was stopped after testing, and the normal local demo server restored. A pre-existing browser cookie temporarily produced the expected missing-session response against the separate store; HTTP tests used their own independent session cookies.
 
 Documentation changes recording these results were made after the source snapshot; application code was not changed during acceptance. This is not a test of a remote GitHub clone or a clean operating-system installation.
 
-## Remaining submission work
+## Later verification
 
 The GitHub synchronization and fresh-clone check were subsequently completed on 2026-10-02: locked installation, 209 tests, TypeScript, lint, production build and the standalone HTTP suite passed. See [delivered-revision verification](GITHUB-DELIVERY.md). This later check supersedes the remote-clone limitation of the original 2026-09-29 report.
-
-1. Confirm the judges' source access and the owner's licensing arrangement for the delivered repository.
-2. Record the English demo video and align the Devpost story/screenshots with `/demo` and its actual capabilities.
-3. Complete the owner's final Devpost submission.
 
 Official Alexa+ access is not connected or verified for this account. The candidate demonstrates the simulated web experience; it must not be described as a live Alexa+ integration, image-understanding system, legal adjudicator or payment processor. The private records/Supabase suite was not rerun in this acceptance pass.

@@ -79,7 +79,7 @@ if (!working.length && diagnoseBedrockFailures(failures) === 'account-restricted
   console.log('Possible causes to check in the Billing and Support consoles of the account that issued the key:');
   console.log('  - the account is on the AWS Free plan, or its activation or verification is incomplete;');
   console.log('  - Bedrock is restricted for the account; an AWS Support case can ask to enable model invocation.');
-  console.log('Moving to a paid plan breaks the project’s zero-cost rule, so the owner must approve it first.');
+  console.log('Moving to a paid plan breaks the project’s zero-cost rule, so it needs an explicit decision first.');
   console.log('Until then, leave COMPANION_BEDROCK_MODEL empty and /demo answers in rule mode.');
   process.exitCode = 1;
 } else if (!working.length) {

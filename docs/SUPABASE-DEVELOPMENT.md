@@ -1,12 +1,12 @@
 # Supabase development connection
 
-The owner's isolated Free project is `rgthmushgkithgkmszsy`. Connection uses the session pooler on port 5432. Data API was disabled during project creation. No paid resources are provisioned by these scripts.
+The isolated Free development project is `rgthmushgkithgkmszsy`. Connection uses the session pooler on port 5432. Data API was disabled during project creation. No paid resources are provisioned by these scripts.
 
 ## Local configuration
 
-`.env.supabase.local` is ignored by Git and deliberately not loaded by the application. It contains `SUPABASE_DB_HOST`, `SUPABASE_DB_PORT`, `SUPABASE_DB_NAME`, `SUPABASE_DB_USER` and the raw `SUPABASE_DB_PASSWORD`. Never paste credentials into chat, commit them, or log the assembled URL. The connection helper percent-encodes credentials and rejects a different project target. Changing that target requires a deliberate code review.
+`.env.supabase.local` is ignored by Git and deliberately not loaded by the application. It contains `SUPABASE_DB_HOST`, `SUPABASE_DB_PORT`, `SUPABASE_DB_NAME`, `SUPABASE_DB_USER` and the raw `SUPABASE_DB_PASSWORD`. Never paste credentials anywhere public, commit them, or log the assembled URL. The connection helper percent-encodes credentials and rejects a different project target. Changing that target requires a deliberate code review.
 
-Run `npm run db:check:supabase` for a read-only inspection of connection identity and public table metadata. It does not read tenant records or run migrations. Errors omit raw database messages because they may contain credentials. Network access may require local execution approval. Run `npm run test:db-config` for synthetic tests with no network or real password.
+Run `npm run db:check:supabase` for a read-only inspection of connection identity and public table metadata. It does not read tenant records or run migrations. Errors omit raw database messages because they may contain credentials. Run `npm run test:db-config` for synthetic tests with no network or real password.
 
 ## Initial connection milestone
 
@@ -18,7 +18,7 @@ The existing Prisma migration chain has now been deployed to the empty developme
 
 `npm run db:initialize:supabase` is an initial-empty-database operation only. It deliberately refuses to run again against the initialized database. Do not reset it to rerun initialization. A failed migration requires inspecting migration metadata before repair, not blind retries.
 
-`npm run db:seed:supabase` initially adds two synthetic tenancies and four users with disabled fixture passwords. Upserts have empty update branches: reruns never overwrite records. No real identity documents, photos or personal data were imported. The separately approved login provisioning step has now assigned generated passwords to those four synthetic users.
+`npm run db:seed:supabase` initially adds two synthetic tenancies and four users with disabled fixture passwords. Upserts have empty update branches: reruns never overwrite records. No real identity documents, photos or personal data were imported. A separate one-time login provisioning step later assigned generated passwords to those four synthetic users.
 
 `src/lib/companion/database.ts` retrieves source notes, raw agreement text and recorded settlement amounts through Prisma. Identity must come from a verified server session; the function does not authenticate an arbitrary supplied ID. It checks the persisted role, suspension/deletion status, tenant ownership or the property's landlord relationship before retrieving evidence. Draft reports and unrelated personal fields are excluded. Corporate/co-tenant/admin access is deliberately not added yet.
 
@@ -28,10 +28,10 @@ The browser `/companion` still uses its isolated local demo. The separate `/reco
 
 ## Authenticated records workspace (2026-09-22)
 
-After the owner's explicit approval, `scripts/provision-records-access.mjs` created the `rentalease_reader` backend login and four synthetic account passwords. Do not rerun this one-time provisioning script. It refuses an existing local configuration; partial failures require inspecting database and file state, not automatic credential rotation.
+The one-time `scripts/provision-records-access.mjs` created the `rentalease_reader` backend login and four synthetic account passwords. Do not rerun this one-time provisioning script. It refuses an existing local configuration; partial failures require inspecting database and file state, not automatic credential rotation.
 
 - `.env.records.local`: ignored backend connection and session-signing secret.
-- `.local-runtime/records-test-accounts.json`: ignored synthetic email/password pairs, for local testing only. Never commit or paste these contents into chat.
+- `.local-runtime/records-test-accounts.json`: ignored synthetic email/password pairs, for local testing only. Never commit these contents or paste them anywhere public.
 - `npm run dev:records`: loopback-only `http://127.0.0.1:3031/records`, separate `.next-records` build directory, no paid model/service calls or admin bootstrap.
 - `npm run test:records:http`: live login, record access, question, sign-out and restricted database privilege checks. The server must already be running. Repeated suites may reach the five-attempt/15-minute per-email development login limit; do not disable the limit.
 
@@ -57,7 +57,7 @@ Verified: four tenant/landlord logins, wrong password, CSRF/origin rejection, ow
 
 ### Confirmed submissions milestone (2026-09-23)
 
-The owner explicitly approved development-database writes for report submission and dispute handling. Migration `20260923000100_records_confirmed_submissions` adds `RecordsRevision`, append-only `RecordsActionEvent`, and the narrowly scoped `records_submit` function. It was applied with `node scripts/deploy-records-writes.mjs`, which refuses unexpected pending/failed migrations. Do not edit an already-applied migration or reset the database to rerun it.
+Development-database writes for report submission and dispute handling were enabled deliberately and narrowly. Migration `20260923000100_records_confirmed_submissions` adds `RecordsRevision`, append-only `RecordsActionEvent`, and the narrowly scoped `records_submit` function. It was applied with `node scripts/deploy-records-writes.mjs`, which refuses unexpected pending/failed migrations. Do not edit an already-applied migration or reset the database to rerun it.
 
 The existing `rentalease_reader` credential now additionally has EXECUTE on this function and SELECT on the two new history/revision tables. Despite its historical name, it can therefore perform the following controlled writes. It still has **no direct table INSERT, UPDATE or DELETE permissions**. Function EXECUTE is revoked from PUBLIC, `anon` and `authenticated`. Both new tables have RLS and no public Data API read access.
 

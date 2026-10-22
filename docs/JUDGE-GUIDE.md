@@ -33,7 +33,7 @@ Start a fresh standard scenario on `/demo` as **Tenant · Aina**.
 
 ## Authenticated records on the configured development machine
 
-Run `npm run dev:records` and open `http://127.0.0.1:3031/guide`. Assigned synthetic credentials are delivered privately by the owner, never in this repository or a public video. See [database setup](SUPABASE-DEVELOPMENT.md).
+Run `npm run dev:records` and open `http://127.0.0.1:3031/guide`. Its synthetic account credentials are kept private and are never in this repository or a public video. See [database setup](SUPABASE-DEVELOPMENT.md).
 
 - Sign in as fixture B's tenant and open the authorized tenancy.
 - Inspect the three-item summary: repainting withdrawn, cleaning accepted at MYR 20.00, key accepted at MYR 25.00. The retained case records MYR 1,755.00 from a MYR 1,800.00 deposit.
@@ -45,7 +45,7 @@ Run `npm run dev:records` and open `http://127.0.0.1:3031/guide`. Assigned synth
 
 The rental conversation queries and previews through a real local MCP connection using the official TypeScript SDK. Its six tools are read-only; confirmation stays in the application. This does not connect to a formal Alexa+ runtime. See [MCP.md](MCP.md) for protocol and authorization boundaries. The independent demo serves the same six tools over its synthetic case at `http://127.0.0.1:3030/api/mcp` with per-case bearer tokens; its boundaries are listed in the [independent demo guide](INDEPENDENT-DEMO.md#storage-and-safety-boundaries).
 
-The records endpoint is local-only. A remote judge cannot reach a localhost URL on the owner's machine. A safe remote evaluation arrangement or separate isolated setup must be agreed before submission; existing development credentials must not be published.
+The records endpoint is local-only. A remote judge cannot reach a localhost URL on the development machine; remote evaluation would need a separate isolated setup, and development credentials are never published. The credential-free `/demo` above is the intended judge path.
 
 ## Reproducible checks
 

@@ -27,7 +27,7 @@ These are fixture-backed prototype features. Completed development integrations 
 - [x] Add an optional local Ollama adapter with validated citations and visible rule fallback.
 - [x] Pass 34 tests plus actual HTTP and browser workflow checks.
 - [x] Install/select a local model after a hardware review, then evaluate real inference.
-- [x] Narrow the release scope to English per owner request; Chinese accuracy is deferred, not fixed.
+- [x] Narrow the release scope to English; Chinese accuracy is deferred, not fixed.
 - [x] Add English follow-up, indirect action, stale amount and history-injection evaluations.
 - [ ] Expand adversarial coverage beyond the small synthetic evaluation before claiming submission-ready quality.
 
@@ -59,7 +59,7 @@ The local demo service uses synthetic identities. The separate Supabase records 
 
 ### Confirmed Supabase submissions (2026-09-23)
 
-- [x] Apply owner-approved, fixture-scoped submission function; keep arbitrary table writes and deletes denied.
+- [x] Apply an approved, fixture-scoped submission function; keep arbitrary table writes and deletes denied.
 - [x] Add signed, expiring, actor-bound previews and explicit confirmation.
 - [x] Persist submitted text reports, tenant disputes and landlord replies with append-only history.
 - [x] Verify concurrent idempotency, stale revisions, cross-tenancy/role checks and unchanged amounts with live integration tests.
@@ -109,21 +109,20 @@ Acceptance: a changed file fails verification; a pending transaction is never la
 - [x] Add regressions for named/word-numbered targets, multi-intent clarification, exact proposal amounts and disputed counter-accounts.
 - [x] Complete the new independent demo's browser workflow and 320/390/760/1280px responsive QA (2026-09-29; keyboard/form interaction, not physical-device certification).
 - [x] Verify a clean local candidate without environment files: locked installation, 209 tests, production build and standalone HTTP workflow (2026-09-29).
-- [x] Synchronize the candidate to GitHub and verify a fresh clone: installation, 209 tests, TypeScript, lint, build and standalone HTTP workflow (2026-10-02). Source access/licensing and the final Devpost submission remain owner delivery steps.
+- [x] Synchronize the candidate to GitHub and verify a fresh clone: installation, 209 tests, TypeScript, lint, build and standalone HTTP workflow (2026-10-02).
 - [x] Fix the Windows-only lockfile that broke `npm ci` on Linux: add the 73 missing platform entries at the locked versions and a regression test, `tests/lockfile-platforms.test.mjs`. Clean `npm ci`, build and lint verified on Linux on 2026-10-08. See [GITHUB-DELIVERY.md](GITHUB-DELIVERY.md#cross-platform-lockfile).
 - [x] Verify on Linux (Node.js 22.22.0) on 2026-10-08: 244/244 tests, typecheck, lint (0 errors), production build, `npm run test:demo:http` in rule mode and against the Bedrock mock, and a headless Chromium walkthrough with mocked speech APIs.
 - [ ] Test a clean clone on macOS.
 
 - [x] Add optional voice input after the text flow works reliably: a browser Web Speech API simulation in `/demo` with spoken replies and suggestion chips (2026-10-08). It is not Alexa and uses no Amazon voice service; tested only with mocked speech APIs.
-- [ ] Test a physical microphone and speaker in Chrome and Edge.
-- [ ] Record an English demo shorter than three minutes.
+- [ ] Test a physical microphone and speaker in Chrome and Edge. (A real microphone in Chrome on Windows was tried on 2026-10-23; recognition often misheard product names.)
+- [x] Record an English demo shorter than three minutes (2026-10-23, rule mode).
 - [x] Add a read-only item-progress summary and authenticated current-snapshot text export with source references.
 - [x] Provide a mode-aware in-app demo guide, reproducible local judge instructions and documented limitations.
-- [x] Prepare an English Devpost draft and timed demo script; owner review and actual recording remain pending.
 - [x] Record observed local-model friction; no Amazon runtime/SDK testing is claimed.
-- [x] Record 2026-10-08 development friction (lockfile, AWS SDK against a mock, MCP-to-Converse schemas, inference profiles, MCP Inspector, Web Speech API). Owner review and additions pending.
+- [x] Record 2026-10-08 development friction (lockfile, AWS SDK against a mock, MCP-to-Converse schemas, inference profiles, MCP Inspector, Web Speech API).
 - [x] Recheck the official Alexa+ simulated web-experience alternative on 2026-09-26; no AWS integration is claimed.
 - [x] Source access and licensing: the repository is public with an MIT `LICENSE` (2026-10-08).
-- [ ] Agree safe remote judge access before final submission, if needed beyond a local clone; do not publish the development credentials.
+- [ ] Isolated remote evaluation setup (not planned: judges run `/demo` from a local clone; development credentials are never published).
 
 Out of scope for this MVP: automatic payments, legal adjudication, a complete repair marketplace, public identity documents, tokens, and mandatory tenant wallets.

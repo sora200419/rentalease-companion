@@ -1,6 +1,6 @@
 # Alexa+ access and submission boundary
 
-Checked: 2026-09-28. This records public requirements, not a check of the owner's private Amazon account. Updated 2026-10-08 with the repository decision and current deliverable; the access findings were not re-checked.
+Checked: 2026-09-28. This records public requirements, not a check of a private Amazon account. Updated 2026-10-08 with the repository decision and current deliverable; the access findings were not re-checked.
 
 ## Confirmed access limitation
 
@@ -8,13 +8,13 @@ The [official hackathon FAQ](https://amazonappdev2026.devpost.com/details/faqs) 
 
 The [Amazon developer docs home](https://developer.amazon.com/docs/alexaplus/add-ons/home.html) independently marks Category SDK and MCP Toolkit as available to selected partners only.
 
-AWS promotional credits do not establish that permission. Do not ask the owner for AWS access keys, pay for an Alexa subscription, create a legacy Alexa skill or deploy AWS infrastructure in an attempt to unlock the preview.
+AWS promotional credits do not establish that permission, and paying for an Alexa subscription, creating a legacy Alexa skill or deploying AWS infrastructure are not a route to the preview.
 
-The FAQ and [Official Rules](https://amazonappdev2026.devpost.com/rules) allow an independently demonstrated MCP/Agent Skill or simulated experience. The FAQ clarifies that a locally runnable public repository plus video can suffice without hosting. RentalEase continues with its own web front end and MCP implementation on the Alexa+ track's simulated experience path. Nothing was published during the 2026-09-28 check. The repository is now public with an MIT `LICENSE` (owner decision recorded 2026-10-08).
+The FAQ and [Official Rules](https://amazonappdev2026.devpost.com/rules) allow an independently demonstrated MCP/Agent Skill or simulated experience. The FAQ clarifies that a locally runnable public repository plus video can suffice without hosting. RentalEase continues with its own web front end and MCP implementation on the Alexa+ track's simulated experience path. Nothing was published during the 2026-09-28 check. The repository is now public with an MIT `LICENSE` (since 2026-10-08).
 
-## If the owner already has a separate partner invitation
+## If a separate partner invitation exists
 
-Ask only for non-secret confirmation of the invitation, enabled product and available onboarding instructions. Never request passwords, client secrets, redemption codes or AWS keys in chat. Public documentation alone is not proof that this account has access. Do not claim registration or deployment until Amazon returns a verified result.
+Only non-secret details are needed: the invitation, the enabled product and its onboarding instructions. Passwords, client secrets, redemption codes and AWS keys are never shared. Public documentation alone does not prove access, and registration or deployment is not claimed until Amazon returns a verified result.
 
 ## Formal integration requirements, when access exists
 

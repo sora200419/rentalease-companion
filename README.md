@@ -37,7 +37,7 @@ Set `COMPANION_BEDROCK_MODEL` (for example `apac.amazon.nova-pro-v1:0` in Malays
 
 It never decides liability or saves anything. An amount in a draft (for example a landlord's revised offer) changes nothing until a person confirms it, and a revised amount still needs the tenant's acceptance. Any Bedrock failure falls back visibly to the rule assistant. See [voice assistant and Bedrock setup](docs/VOICE-ASSISTANT.md).
 
-The Bedrock path is tested end to end with the real AWS SDK against a local mock Converse server (`scripts/mock-bedrock.mjs`). On 2026-10-17 and again on 2026-10-23 the owner's AWS account refused every live invocation (details in [FRICTION_LOG.md](docs/FRICTION_LOG.md)). On 2026-10-23 every Nova model in every region tried returned `ValidationException: Operation not allowed`, which points at an account-level restriction rather than the code. `npm run check:bedrock` tries the likely model and region combinations and reports when the pattern points at the account. The submitted demo video was therefore recorded in rule mode, and no live Bedrock result is claimed.
+The Bedrock path is tested end to end with the real AWS SDK against a local mock Converse server (`scripts/mock-bedrock.mjs`). On 2026-10-17 and again on 2026-10-23 my AWS account refused every live invocation (details in [FRICTION_LOG.md](docs/FRICTION_LOG.md)). On 2026-10-23 every Nova model in every region tried returned `ValidationException: Operation not allowed`, which points at an account-level restriction rather than the code. `npm run check:bedrock` tries the likely model and region combinations and reports when the pattern points at the account. The submitted demo video was therefore recorded in rule mode, and no live Bedrock result is claimed.
 
 ## MCP server
 
@@ -166,8 +166,6 @@ npm run build
 - [Judge guide and repeatable walkthrough](docs/JUDGE-GUIDE.md)
 - [Voice assistant and Amazon Bedrock setup](docs/VOICE-ASSISTANT.md)
 - [MCP endpoints and client recipes](docs/MCP.md)
-- [Devpost draft for owner review](docs/DEVPOST-DRAFT.md)
-- [English recording script](docs/DEMO-SCRIPT.md)
 - [Final acceptance and limitations](docs/FINAL-ACCEPTANCE.md)
 - [GitHub candidate and clone verification](docs/GITHUB-DELIVERY.md)
 - [MVP and development backlog](docs/ROADMAP.md)

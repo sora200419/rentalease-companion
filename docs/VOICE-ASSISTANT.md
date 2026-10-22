@@ -127,7 +127,7 @@ Verified in a Linux container (Node 22.22.0):
 - Safari and Firefox;
 - a macOS clean clone.
 
-Run the Bedrock setup above with your own account and record what you observe in [FRICTION_LOG.md](FRICTION_LOG.md) before submitting.
+To try a live call, run the Bedrock setup above with your own AWS account; observed issues so far are in [FRICTION_LOG.md](FRICTION_LOG.md).
 
 ## Troubleshooting
 
