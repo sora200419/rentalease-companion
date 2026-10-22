@@ -71,6 +71,6 @@ Do not run database initialization, migrations or private-record seeding for thi
 
 **If it fails.** If it fails after `npm install` was run on Windows, do not commit that lockfile. Restore `package-lock.json` from Git, then add or update dependencies from macOS or Linux instead; adding `@aws-sdk/client-bedrock-runtime` on Linux kept all entries. Run `npm test` again before committing.
 
-## Owner delivery items
+## Licence
 
-The repository is public and includes an MIT `LICENSE` (copyright sora200419). The English video, final Devpost copy and actual submission remain owner delivery steps.
+The repository is public and includes an MIT `LICENSE` (copyright sora200419).

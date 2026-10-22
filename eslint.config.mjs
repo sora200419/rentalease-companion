@@ -30,7 +30,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Exclude accidental local Codex artifact trees from project linting.
+    // Exclude accidental local tool artifact trees from project linting.
     "~/**",
     // Exclude non-production files (docs, plans, specs, tests, build artifacts).
     "deployment/**",

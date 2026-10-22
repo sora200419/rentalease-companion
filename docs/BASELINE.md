@@ -1,6 +1,6 @@
 # Source baseline
 
-Initialized on 2026-09-21 from the owner's final-year-project source archive (file name withheld because it contains personal details; the SHA-256 below identifies it).
+Initialized on 2026-09-21 from my final-year-project source archive (file name withheld because it contains personal details; the SHA-256 below identifies it).
 
 - Archive SHA-256: `a395dc32820cde0fd4506ed175a7ab1f81b654297e10027a85f9db2282fd2282`.
 - Imported root: `rentalease-malaysia-submission/`.

@@ -38,9 +38,9 @@ Before external testing, mount the tested metadata/challenge handler only after 
 
 A remote deployment also needs HTTPS, deployment-specific Host/Origin validation, an explicit client policy, shared rate limits, secret storage, request/transaction timeouts, bounded logs and operational monitoring. Logs must omit token values, raw evidence, prompts and private file identifiers. File malware scanning and retention remain separate production work.
 
-Use an isolated synthetic judge dataset and owner-approved access arrangement. Existing local development credentials and test-account files must not be shipped in a deployment bundle or published in a video. A remote OAuth implementation must pass independent account-isolation and revocation tests before the loopback restriction is changed.
+Use an isolated synthetic judge dataset and an approved access arrangement. Existing local development credentials and test-account files must not be shipped in a deployment bundle or published in a video. A remote OAuth implementation must pass independent account-isolation and revocation tests before the loopback restriction is changed.
 
-## Owner decisions before creating external state
+## Decisions before creating external state
 
 Confirm the deployment account and region, credit redemption and eligible services, a small spending budget, the intended client/provider, and which synthetic data can be reachable remotely. Budget alerts do not stop charges. Review actual service pricing before creating resources. Formal Alexa+ permissions and integration validation remain a distinct gate; passing local MCP tests does not satisfy that gate.
 

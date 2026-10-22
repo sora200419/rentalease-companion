@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { parseEnv } from 'node:util';
 
-// Deliberately scoped to the owner's separate development project.
+// Deliberately scoped to the separate development project.
 export function buildDevelopmentDatabaseUrl(values) {
   if (values.SUPABASE_DB_HOST !== 'aws-0-ap-northeast-1.pooler.supabase.com' ||
       values.SUPABASE_DB_USER !== 'postgres.rgthmushgkithgkmszsy' ||

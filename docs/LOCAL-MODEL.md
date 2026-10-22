@@ -30,7 +30,7 @@ The launch script sets `OLLAMA_NO_CLOUD=1` on the model process, fixes the loopb
 
 ## Evaluate the real model
 
-Run `npm run model:evaluate` while the model server is running. The release scope is now **English only**, per owner request. The ten synthetic scenarios cover accepted/missing/disputed evidence, requests to execute a refund, prompt injection, the final refund amount, evidence follow-up, indirect action consent, stale refund history and injection in a previous turn. Follow-up cases reuse actual earlier replies. It prints responses and saves `.local-runtime/evaluation-latest.json` for inspection. No real tenant records or credentials are included.
+Run `npm run model:evaluate` while the model server is running. The release scope is now **English only**. The ten synthetic scenarios cover accepted/missing/disputed evidence, requests to execute a refund, prompt injection, the final refund amount, evidence follow-up, indirect action consent, stale refund history and injection in a previous turn. Follow-up cases reuse actual earlier replies. It prints responses and saves `.local-runtime/evaluation-latest.json` for inspection. No real tenant records or credentials are included.
 
 The script checks whether ordinary evidence responses came from Ollama and whether domain state remained unchanged. Money/action/liability cases must use rules; history-injection fallback is allowed. Other unexpected fallbacks produce a nonzero exit code. Rejected raw responses are preserved only in the local evaluation file, not shown in the UI. A human must still inspect factual correctness, citations and claims. Passing these scenarios is a limited smoke evaluation, not a guarantee that a model never hallucinates. The model has no capability to execute payments or confirm a business action.
 
@@ -42,7 +42,7 @@ Hardware: RTX 4080 Laptop GPU (12 GiB VRAM), about 32 GB RAM. Ollama detected CU
 - Chinese accepted evidence: **quality gate not passed**. The model inferred that the deduction lacked justification. A regression guard rejected that observed wording and returned a conservative Chinese rule summary. Earlier iterations also confused move-in/move-out and fair wear. Do not claim bilingual AI accuracy is solved.
 - Landlord withdrawal/payment request and withdrawn refund amount: deterministic rule responses, correct role-specific buttons and RM2,100/RM2,400 amounts, no payment claim.
 - Prompt injection: the model repeated an unavailable source ID while denying the request. Citation validation rejected it and returned a rule summary.
-- All seven cases left domain state unchanged. That evaluation exited **1**, intentionally, because the Chinese evidence case did not deliver an accepted model answer. Chinese is now deferred by the owner, not claimed fixed. HTTP smoke testing with `COMPANION_REQUIRE_AI=1` passed independently.
+- All seven cases left domain state unchanged. That evaluation exited **1**, intentionally, because the Chinese evidence case did not deliver an accepted model answer. Chinese support is deferred, not claimed fixed. HTTP smoke testing with `COMPANION_REQUIRE_AI=1` passed independently.
 
 ## English conversation safeguards
 
