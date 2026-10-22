@@ -1,5 +1,7 @@
 # Offline companion walkthrough
 
+> **Historical (2026-09-21):** the first offline prototype. The current judge walkthrough, with three deductions, voice and MCP, is [INDEPENDENT-DEMO.md](INDEPENDENT-DEMO.md).
+
 This page covers only the local companion. See [JUDGE-GUIDE.md](JUDGE-GUIDE.md) for both workspaces and [LOCAL-SERVER.md](LOCAL-SERVER.md) for local sessions. An in-app guide is available at `/guide` in either development mode.
 
 ## Start

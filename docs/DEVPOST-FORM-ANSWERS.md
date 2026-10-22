@@ -54,7 +54,7 @@ Judges need no cloud keys: `npm ci && npm run dev:companion`, then open `http://
 - Keeping a plausible answer separate from an authorized action: the assistant may cite a real report and still over-interpret it, so answers quote records exactly and drafts must pass a rule check before they become a preview.
 - Representing a revised proposal without changing the settlement total too early.
 - MCP SDK tool schemas (draft-07, `additionalProperties: false`, nested `oneOf`) did not match what Amazon Nova accepts for Converse tools, so an adapter flattens them while the server still validates exact input.
-- My AWS account refused every Bedrock model invocation across regions and models, on 2026-10-17 while account verification was pending and again on 2026-10-23 with "Operation not allowed". I added a diagnostic (`npm run check:bedrock`) that names the account-level cause, and recorded the demo in rule mode instead of faking a model answer.
+- My AWS account refused every Bedrock model invocation across regions and models, on 2026-10-17 while account verification was pending and again on 2026-10-23 with "Operation not allowed". I added a diagnostic (`npm run check:bedrock`) that reports when the failure pattern points at the account, and recorded the demo in rule mode instead of faking a model answer.
 - A lockfile generated on Windows silently dropped other platforms' native binaries, so a clean Linux install failed. A regression test now guards it.
 - Browser speech recognition often misheard "RentalEase" and "scuff" in my accent, so the card also accepts typed questions.
 

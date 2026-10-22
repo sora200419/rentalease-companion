@@ -1,5 +1,7 @@
 # Local service and optional Ollama integration
 
+> **Historical (2026-09-22 milestone):** the local-service design here still underlies `/demo`, but the optional Ollama inference is an early experiment that the judge demo and the submitted video do not use. For the current walkthrough see [INDEPENDENT-DEMO.md](INDEPENDENT-DEMO.md).
+
 ## Current milestone
 
 The browser now calls a local Next.js API for evidence, settlement state, chat, drafts and confirmations. It no longer calculates authoritative state or writes the scenario to localStorage. Existing v1 localStorage records are left untouched and are not imported.

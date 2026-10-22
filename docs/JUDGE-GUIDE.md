@@ -49,7 +49,7 @@ The records endpoint is local-only. A remote judge cannot reach a localhost URL 
 
 ## Reproducible checks
 
-- `npm test`: pure business, conversation, evidence and summary regressions, plus voice phrasing, assistant, demo MCP token and lockfile platform checks; no cloud credentials. The assistant tests use a scripted stand-in for Bedrock Converse. 244 of 244 passed on 2026-10-08.
+- `npm test`: pure business, conversation, evidence and summary regressions, plus voice phrasing, assistant, demo MCP token and lockfile platform checks; no cloud credentials. The assistant tests use a scripted stand-in for Bedrock Converse. 244 of 244 passed on 2026-10-08 (Linux); 255 of 255 passed on 2026-10-23 (Windows) after the Bedrock diagnosis and dispute-letter tests were added.
 - `npm run test:mcp`: standard-client protocol, tool schemas, preview and access-isolation checks with synthetic records, including the demo endpoint's bearer token, host and Origin checks.
 - `npm run test:demo:http`: against the running `npm run dev:companion` server; the full demo workflow plus the assistant and an MCP SDK client over real HTTP with the case bearer token. Passed on 2026-10-08 in rule mode and in Bedrock mode against the local mock.
 - `npm run typecheck`: TypeScript verification.

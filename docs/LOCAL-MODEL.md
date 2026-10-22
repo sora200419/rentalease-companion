@@ -1,5 +1,7 @@
 # Running the companion with local AI
 
+> **Historical (September 2026):** an early experiment in the authenticated records workspace. The judge demo (`/demo`), the optional Bedrock path and the submitted video do not use Ollama or Qwen.
+
 The selected development model is `qwen3:4b` (Q4_K_M, about 2.5 GB). It is stored locally and used through Ollama, with no model API fee. Downloads use network bandwidth; inference uses your computer's memory, GPU and electricity.
 
 ## Start on the configured development computer

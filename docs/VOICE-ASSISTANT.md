@@ -107,6 +107,8 @@ npm run test:demo:http
 
 ## Verification status (2026-10-08)
 
+Live update, 2026-10-23: a real AWS account refused every Bedrock invocation (also on 2026-10-17), so no live model answer has been received; `npm run check:bedrock` reports that the pattern points at the account, and details are in [FRICTION_LOG.md](FRICTION_LOG.md). A real microphone in Chrome on Windows reached the voice card, but recognition often misheard "RentalEase" and "scuff"; typed questions work as a fallback. `npm test` passed 255/255 on Windows the same day.
+
 Verified in a Linux container (Node 22.22.0):
 
 - `npm test`: 244/244 pass, including scripted-model tests of the tool loop, drafts, fallback, role rules and schema flattening.

@@ -1,6 +1,6 @@
 # Source baseline
 
-Initialized on 2026-09-21 from the owner-provided archive `MR_ONG_YE_HONG_TP074096_APD3F2509SE_SE_FYP_SOURCE_CODE.zip`.
+Initialized on 2026-09-21 from the owner's final-year-project source archive (file name withheld because it contains personal details; the SHA-256 below identifies it).
 
 - Archive SHA-256: `a395dc32820cde0fd4506ed175a7ab1f81b654297e10027a85f9db2282fd2282`.
 - Imported root: `rentalease-malaysia-submission/`.
