@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+import { diagnoseBedrockFailures, geographyPrefix } from './bedrock-diagnosis.mjs';
 
 // Reads .env.local the way `next dev` does, then sends the smallest possible
 // Converse request so Amazon Bedrock's own rejection reason is visible. No
@@ -32,7 +33,7 @@ console.log('');
 
 // A cross-region inference profile only works from its own geography, so each
 // candidate pairs a prefix with the regions that accept it.
-const base = configuredModel.replace(/^(?:apac|us|eu|global|apne1|us-gov)\./, '');
+const base = configuredModel.replace(geographyPrefix, '');
 const geographies = [
   ['apac.', ['ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1']],
   ['us.', ['us-east-1', 'us-west-2']],
@@ -50,6 +51,7 @@ for (const name of [base, ...alternatives.filter(a => a !== base)])
 
 const request = { messages: [{ role: 'user', content: [{ text: 'Reply with the single word: ready.' }] }], inferenceConfig: { maxTokens: 16 } };
 const working = [];
+const failures = [];
 for (const candidate of candidates) {
   const client = new BedrockRuntimeClient({ region: candidate.region, maxAttempts: 1 });
   const label = candidate.region.padEnd(15) + ' ' + candidate.modelId;
@@ -60,6 +62,7 @@ for (const candidate of candidates) {
     working.push(candidate);
   } catch (error) {
     console.log('FAIL  ' + label + '  → ' + (error?.name ?? 'Error') + ': ' + (error?.message ?? ''));
+    failures.push({ ...candidate, name: error?.name ?? 'Error', message: error?.message ?? '' });
   } finally {
     client.destroy();
   }
@@ -68,11 +71,23 @@ for (const candidate of candidates) {
 }
 
 console.log('');
-if (!working.length) {
+if (!working.length && diagnoseBedrockFailures(failures) === 'account-restricted') {
+  console.log('No combination worked, and the pattern points at the AWS account, not the model id.');
+  console.log('No call failed with UnrecognizedClientException or AccessDeniedException, so the key and IAM');
+  console.log('are probably fine, yet every attempt that got an answer refused an existing model id with');
+  console.log('“Operation not allowed” (timeouts and throttles are not counted). Changing the model id is unlikely to help.');
+  console.log('Possible causes to check in the Billing and Support consoles of the account that issued the key:');
+  console.log('  - the account is on the AWS Free plan, or its activation or verification is incomplete;');
+  console.log('  - Bedrock is restricted for the account; an AWS Support case can ask to enable model invocation.');
+  console.log('Moving to a paid plan breaks the project’s zero-cost rule, so the owner must approve it first.');
+  console.log('Until then, leave COMPANION_BEDROCK_MODEL empty and /demo answers in rule mode.');
+  process.exitCode = 1;
+} else if (!working.length) {
   console.log('No combination worked. The message above is Amazon Bedrock’s own reason; common causes:');
   console.log('  UnrecognizedClientException — the API key is wrong, expired, or belongs to another account.');
   console.log('  AccessDeniedException       — an IAM policy or service control policy denies bedrock:InvokeModel.');
-  console.log('  “Operation not allowed”     — the model is retired, or the key does not cover this inference profile.');
+  console.log('  “Operation not allowed”     — the model is retired, the key does not cover this inference profile,');
+  console.log('                                or the AWS account itself is restricted from calling Bedrock.');
   console.log('Open the Bedrock console in this region → Model catalog, and use an id listed there.');
   process.exitCode = 1;
 } else if (working[0].modelId === configuredModel && working[0].region === configuredRegion) {
